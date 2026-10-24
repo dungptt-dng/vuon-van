@@ -1,0 +1,8 @@
+# Tài liệu gốc dung lượng lớn (SGK, ảnh gốc) – không đưa vào git
+*.pdf
+MAN HINH DANG NHAP.png
+
+# Tệp tạm của hệ điều hành
+Thumbs.db
+desktop.ini
+.DS_Store

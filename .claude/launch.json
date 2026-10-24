@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vuon-van",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Users\\Dell\\Desktop\\VUON_VAN\\app\\server.ps1"],
+      "port": 8686
+    }
+  ]
+}

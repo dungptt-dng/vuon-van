@@ -1,0 +1,16 @@
+{
+  "name": "Vườn Văn – Luyện viết văn lớp 4",
+  "short_name": "Vườn Văn",
+  "description": "Giúp học sinh lớp 4 luyện viết văn theo SGK Tiếng Việt 4 Kết nối tri thức với cuộc sống.",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#bfe6ff",
+  "theme_color": "#3cb043",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

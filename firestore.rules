@@ -1,0 +1,19 @@
+rules_version = '2';
+// Luật bảo mật Firestore cho app Vườn Văn.
+// Dữ liệu của mỗi lớp nằm trong classes/{maLop}/{loai}/{id} – chỉ máy đã đăng nhập (ẩn danh) qua app mới đọc/ghi được.
+// Mã lớp đóng vai trò "chìa khoá" của lớp: thầy cô nên đặt mã khó đoán, ví dụ 4A-HOAMAI-2731.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /classes/{classCode}/{store}/{docId} {
+      allow read, delete: if request.auth != null
+        && store in ['students', 'essays', 'assignments', 'reports', 'backups', 'config'];
+      allow create, update: if request.auth != null
+        && store in ['students', 'essays', 'assignments', 'reports', 'backups', 'config']
+        && request.resource.data.keys().size() < 200;
+    }
+    // Mọi đường dẫn khác: chặn
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

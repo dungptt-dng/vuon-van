@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vườn Văn – Luyện viết văn lớp 4</title>
+  <meta name="description" content="Vườn Văn giúp học sinh lớp 4 luyện viết văn theo SGK Tiếng Việt 4 Kết nối tri thức với cuộc sống.">
+  <meta name="theme-color" content="#3cb043">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Bỏ qua, đến nội dung chính</a>
+
+  <!-- ============ MÀN HÌNH ĐĂNG NHẬP ============ -->
+  <section id="s-login" class="screen login" aria-labelledby="login-title">
+    <div class="login-bg" role="img" aria-label="Vườn Văn – Mỗi em một sắc hoa, mỗi bài văn một nét riêng"></div>
+    <form id="login-form" class="login-card" autocomplete="off" novalidate>
+      <h1 id="login-title" class="sr-only">Vườn Văn</h1>
+      <p class="login-hello">Chào em! Em tên là gì nhỉ? 🌱</p>
+      <div class="login-fields">
+        <div>
+          <label for="login-name" class="field-label">Họ và tên của em</label>
+          <input id="login-name" name="name" type="text" required minlength="2" maxlength="40" placeholder="Ví dụ: Nguyễn Minh An" autocomplete="name">
+        </div>
+        <div>
+          <label for="login-class" class="field-label">Mã lớp <span class="muted small">(thầy cô cho)</span></label>
+          <input id="login-class" name="classCode" type="text" maxlength="24" placeholder="Ví dụ: 4A-HOAMAI" autocapitalize="characters">
+        </div>
+      </div>
+      <p id="login-error" class="form-error" role="alert"></p>
+      <div class="login-actions">
+        <button type="submit" class="btn btn-primary btn-big">Vào vườn văn 🌻</button>
+        <button type="button" id="btn-teacher-login" class="link-btn">👩‍🏫 Giáo viên</button>
+      </div>
+      <div id="login-recent" class="login-recent"></div>
+    </form>
+  </section>
+
+  <!-- ============ KHUNG ỨNG DỤNG ============ -->
+  <div id="app-shell" class="shell" hidden>
+    <header class="topbar">
+      <button class="brand" id="brand-home" aria-label="Về trang chọn bài">
+        <img src="assets/icon-192.png" alt="" width="40" height="40"><span>Vườn Văn</span>
+      </button>
+      <nav class="nav" aria-label="Điều hướng chính" id="nav-student">
+        <button data-go="s-choose" class="nav-btn">✏️ <span>Viết bài</span></button>
+        <button data-go="s-mine" class="nav-btn">📚 <span>Bài của em</span></button>
+        <button data-go="s-tasks" class="nav-btn">🔔 <span>Bài tập</span><b class="badge" id="task-badge" hidden>0</b></button>
+      </nav>
+      <nav class="nav" aria-label="Điều hướng giáo viên" id="nav-teacher" hidden>
+        <span class="role-pill">👩‍🏫 Giáo viên · Lớp <b id="t-class-label"></b></span>
+      </nav>
+      <div class="top-right">
+        <span id="net-chip" class="chip" role="status" aria-live="polite">●</span>
+        <button class="icon-btn" id="btn-a11y" aria-label="Cỡ chữ và hiển thị" title="Cỡ chữ và hiển thị">Aa</button>
+        <span class="who" id="who"></span>
+        <button class="icon-btn" id="btn-logout" aria-label="Đăng xuất" title="Đăng xuất">⏏</button>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <!-- ============ CHỌN BÀI VIẾT ============ -->
+      <section id="s-choose" class="screen" hidden aria-labelledby="choose-title">
+        <div class="page-head">
+          <h2 id="choose-title">Hôm nay em muốn viết gì? 🌼</h2>
+          <p class="muted">Chọn lần lượt 4 bước dưới đây, Vườn Văn sẽ gieo cho em một bản thảo gợi ý.</p>
+        </div>
+        <div id="assignment-banner" class="banner" hidden></div>
+
+        <div class="step card">
+          <h3><span class="step-no">1</span> Dạng văn muốn viết <small class="muted">(theo SGK Tiếng Việt 4 – Kết nối tri thức)</small></h3>
+          <div class="filter-row" role="group" aria-label="Lọc theo tập sách">
+            <button class="chip-btn active" data-book="all">Tất cả</button>
+            <button class="chip-btn" data-book="Tập một">Tập một</button>
+            <button class="chip-btn" data-book="Tập hai">Tập hai</button>
+          </div>
+          <div id="genre-grid" class="genre-grid" role="radiogroup" aria-label="Dạng văn"></div>
+        </div>
+
+        <div class="step card" id="step-topic">
+          <h3><span class="step-no">2</span> Chủ đề</h3>
+          <p class="field-label">Chủ điểm trong sách</p>
+          <div id="theme-row" class="chip-row" role="radiogroup" aria-label="Chủ điểm"></div>
+          <p class="field-label">Đề bài gợi ý <span class="muted">(chọn một đề hoặc tự nhập)</span></p>
+          <div id="topic-list" class="topic-list" role="radiogroup" aria-label="Đề bài gợi ý"></div>
+          <label for="topic-custom" class="field-label">Hoặc em tự nhập đề bài</label>
+          <input id="topic-custom" type="text" maxlength="200" placeholder="Ví dụ: Tả cây xoài trong vườn nhà bà ngoại">
+        </div>
+
+        <div class="step card">
+          <h3><span class="step-no">3</span> Cách gợi ý <small class="muted">(chọn một hoặc nhiều cách)</small></h3>
+          <div id="hint-grid" class="hint-grid" role="group" aria-label="Cách gợi ý"></div>
+        </div>
+
+        <div class="step card">
+          <h3><span class="step-no">4</span> Yêu cầu cụ thể của em</h3>
+          <label for="req" class="sr-only">Yêu cầu cụ thể</label>
+          <textarea id="req" rows="3" maxlength="600" placeholder="Ví dụ: Em muốn tả chú mèo Mướp nhà em. Mướp có bộ lông vàng, rất thích nằm sưởi nắng và hay bắt chuột. Em muốn bài văn có hình ảnh so sánh."></textarea>
+          <div class="row-end">
+            <span id="choose-error" class="form-error" role="alert"></span>
+            <button id="btn-make-draft" class="btn btn-primary btn-big">🌱 Gieo hạt – Tạo bản thảo gợi ý</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ BẢN THẢO GỢI Ý ============ -->
+      <section id="s-draft" class="screen" hidden aria-labelledby="draft-title">
+        <div class="page-head">
+          <button class="btn btn-ghost" data-go="s-choose">← Chọn lại</button>
+          <h2 id="draft-title">Bản thảo gợi ý</h2>
+          <div id="draft-meta" class="muted"></div>
+        </div>
+        <div id="draft-body"></div>
+        <div class="sticky-actions">
+          <button class="btn btn-ghost" id="btn-redraft">🔄 Tạo lại</button>
+          <button class="btn btn-ghost" id="btn-read-draft">🔊 Đọc to</button>
+          <button class="btn btn-primary btn-big" id="btn-start-write">✏️ Bắt đầu viết bài</button>
+        </div>
+      </section>
+
+      <!-- ============ VIẾT BÀI ============ -->
+      <section id="s-write" class="screen" hidden aria-labelledby="write-title">
+        <div class="page-head">
+          <button class="btn btn-ghost" id="btn-back-draft">← Xem lại gợi ý</button>
+          <h2 id="write-title">Em viết bài nhé!</h2>
+          <div id="write-topic" class="topic-pill"></div>
+        </div>
+        <div class="write-layout">
+          <div class="editor-col">
+            <div class="editor-tools" role="toolbar" aria-label="Công cụ viết">
+              <button class="btn btn-small" id="btn-check">🔍 Kiểm tra chính tả</button>
+              <button class="btn btn-small" id="btn-check-ai">🤖 Kiểm tra sâu bằng AI</button>
+              <button class="btn btn-small btn-ghost" id="btn-read-essay">🔊 Nghe lại bài</button>
+              <span id="save-state" class="muted small" aria-live="polite"></span>
+            </div>
+            <label for="editor" class="sr-only">Bài viết của em</label>
+            <textarea id="editor" class="paper" spellcheck="false" placeholder="Em bắt đầu viết ở đây… (Mỗi đoạn văn xuống dòng một lần)"></textarea>
+            <div class="progress-row">
+              <div class="progress" aria-hidden="true"><div id="word-bar"></div></div>
+              <span id="word-count" class="small"></span>
+            </div>
+            <div id="check-panel" class="check-panel" hidden aria-live="polite"></div>
+            <div class="row-end">
+              <button class="btn btn-ghost" id="btn-save">💾 Lưu nháp</button>
+              <button class="btn btn-primary btn-big" id="btn-submit">📤 Nộp bài</button>
+            </div>
+          </div>
+          <aside class="hint-col" aria-label="Túi gợi ý">
+            <details open>
+              <summary>🎒 Túi gợi ý của em</summary>
+              <div id="hint-pocket"></div>
+            </details>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ KẾT QUẢ ============ -->
+      <section id="s-result" class="screen" hidden aria-labelledby="result-title">
+        <div class="page-head"><h2 id="result-title">Kết quả bài viết 🌟</h2></div>
+        <div id="result-body"></div>
+        <div class="sticky-actions">
+          <button class="btn btn-ghost" id="btn-revise">✏️ Sửa bài và nộp lại</button>
+          <button class="btn btn-ghost" data-go="s-mine">📚 Bài của em</button>
+          <button class="btn btn-primary" data-go="s-choose">🌱 Viết bài mới</button>
+        </div>
+      </section>
+
+      <!-- ============ BÀI CỦA EM ============ -->
+      <section id="s-mine" class="screen" hidden aria-labelledby="mine-title">
+        <div class="page-head"><h2 id="mine-title">Khu vườn bài văn của em 🌳</h2></div>
+        <div id="mine-stats" class="stat-grid"></div>
+        <div id="mine-list" class="list"></div>
+      </section>
+
+      <!-- ============ BÀI TẬP ============ -->
+      <section id="s-tasks" class="screen" hidden aria-labelledby="tasks-title">
+        <div class="page-head">
+          <h2 id="tasks-title">Bài tập thầy cô giao 🔔</h2>
+          <button class="btn btn-small" id="btn-enable-notify">🔔 Bật thông báo nhắc bài</button>
+        </div>
+        <div id="tasks-list" class="list"></div>
+      </section>
+
+      <!-- ============ GIÁO VIÊN ============ -->
+      <section id="s-teacher" class="screen" hidden aria-labelledby="teacher-title">
+        <h2 id="teacher-title" class="sr-only">Trang giáo viên</h2>
+        <div class="tabs" role="tablist" aria-label="Mục quản lí">
+          <button role="tab" class="tab active" data-tab="t-overview" aria-selected="true">📊 Tổng quan</button>
+          <button role="tab" class="tab" data-tab="t-essays" aria-selected="false">📝 Bài làm</button>
+          <button role="tab" class="tab" data-tab="t-students" aria-selected="false">👧 Học sinh</button>
+          <button role="tab" class="tab" data-tab="t-assign" aria-selected="false">🔔 Giao bài</button>
+          <button role="tab" class="tab" data-tab="t-report" aria-selected="false">📈 Báo cáo</button>
+          <button role="tab" class="tab" data-tab="t-settings" aria-selected="false">⚙️ Cài đặt</button>
+        </div>
+        <div id="t-overview" class="tabpanel" role="tabpanel"></div>
+        <div id="t-essays" class="tabpanel" role="tabpanel" hidden></div>
+        <div id="t-students" class="tabpanel" role="tabpanel" hidden></div>
+        <div id="t-assign" class="tabpanel" role="tabpanel" hidden></div>
+        <div id="t-report" class="tabpanel" role="tabpanel" hidden></div>
+        <div id="t-settings" class="tabpanel" role="tabpanel" hidden></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ HỘP THOẠI ============ -->
+  <dialog id="dlg" class="dlg" aria-labelledby="dlg-title">
+    <form method="dialog" class="dlg-inner">
+      <header class="dlg-head"><h3 id="dlg-title"></h3><button class="icon-btn" value="cancel" aria-label="Đóng">✕</button></header>
+      <div id="dlg-body" class="dlg-body"></div>
+      <footer id="dlg-foot" class="dlg-foot"></footer>
+    </form>
+  </dialog>
+
+  <div id="loading" class="loading" hidden role="status" aria-live="assertive">
+    <div class="sprout" aria-hidden="true">🌱</div>
+    <p id="loading-text">Đang gieo hạt…</p>
+  </div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/spell.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/notify.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/teacher.js"></script>
+</body>
+</html>
