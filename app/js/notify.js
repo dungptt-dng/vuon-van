@@ -1,5 +1,5 @@
 /* Thông báo nhắc bài tập.
-   - Bài tập mới (nhận qua đồng bộ thời gian thực) → thông báo ngay.
+   - Bài tập mới (thầy cô giao trên máy này hoặc nhận qua tệp) → thông báo ngay.
    - Bài sắp đến hạn (trong 24 giờ) mà chưa nộp → nhắc.
    - Nhắc luyện viết hằng ngày theo giờ thầy cô/phụ huynh đặt.
    - Khi cài app (PWA) trên Chrome/Edge: service worker kiểm tra định kì cả khi app đóng (Periodic Background Sync). */

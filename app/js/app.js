@@ -7,7 +7,7 @@ window.VV = window.VV || {};
   var esc = VV.esc;
 
   var state = VV.state = {
-    role: null, student: null, classCode: null, deviceId: null,
+    role: null, student: null, classCode: null,
     current: { genreId: null, themeId: 'tu-do', topic: '', topicCustom: '', hintTypes: ['vocab', 'paragraph'], request: '', assignmentId: null },
     draft: null, essay: null, bookFilter: 'all', ignored: {}
   };
@@ -75,24 +75,16 @@ window.VV = window.VV || {};
     if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
       navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('SW', e); });
     }
-    VV.db.getKV('deviceId', null).then(function (id) {
-      if (!id) { id = VV.db.uid('dev'); VV.db.setKV('deviceId', id); }
-      state.deviceId = id;
-    });
     loadPrefs();
-    updateNet();
-    window.addEventListener('online', function () { updateNet(); ui.toast('Đã có mạng trở lại 🌤️ Đang đồng bộ…', 'ok'); processPending(); });
-    window.addEventListener('offline', function () { updateNet(); ui.toast('Mất mạng – em vẫn viết bình thường, bài được lưu trên máy.', 'warn', 5000); });
-    document.addEventListener('vv:sync', updateNet);
-    document.addEventListener('vv:remote', onRemote);
+    document.addEventListener('vv:data', onImported);
 
-    $('#login-class').value = (VV.CONFIG && VV.CONFIG.defaultClassCode) || '';
     renderRecentLogins();
     bindLogin();
     bindShell();
     bindChoose();
     bindDraft();
     bindWrite();
+    bindExchange();
 
     // Tự vào lại phiên trước (ví dụ khi tải lại trang)
     VV.db.getKV('session', null).then(function (s) {
@@ -107,22 +99,6 @@ window.VV = window.VV || {};
       document.documentElement.style.setProperty('--fs', r[0] + 'px');
       document.body.classList.toggle('hc', !!r[1]);
     });
-  }
-
-  function updateNet() {
-    var chip = $('#net-chip');
-    if (!chip) return;
-    var st = VV.sync.status();
-    var on = navigator.onLine;
-    var txt, cls;
-    if (!on) { txt = '🟠 Ngoại tuyến'; cls = 'off'; }
-    else if (st.state === 'synced' || st.state === 'syncing') { txt = st.state === 'syncing' ? '🔄 Đang đồng bộ' : '🟢 Đã đồng bộ'; cls = 'on'; }
-    else if (st.state === 'error') { txt = '⚠️ Lỗi đồng bộ'; cls = 'err'; }
-    else if (st.state === 'connecting') { txt = '🔄 Đang kết nối'; cls = ''; }
-    else { txt = '🟢 Trực tuyến'; cls = 'on'; }
-    chip.textContent = txt;
-    chip.className = 'chip ' + cls;
-    chip.title = st.message + (st.lastSync ? ' · lần cuối ' + VV.fmt.ago(st.lastSync) : '');
   }
 
   /* ================= ĐĂNG NHẬP ================= */
@@ -179,15 +155,11 @@ window.VV = window.VV || {};
     $('#nav-teacher').hidden = true;
     $('#who').textContent = '🌱 ' + st.name;
     ui.show('s-choose');
-    VV.sync.start({ classCode: st.classCode, role: 'student', studentId: st.id }).then(function () {
-      VV.sync.autoBackup({ role: 'student', studentId: st.id, deviceId: state.deviceId });
-      processPending();
-    });
+    VV.backup.auto({ role: 'student', studentId: st.id });
     VV.notify.startLoop(function () { VV.notify.checkStudent(state.student); updateTaskBadge(); });
   }
 
   VV.logout = function () {
-    VV.sync.stop();
     VV.notify.stop();
     VV.db.setKV('session', null);
     state.role = null; state.student = null; state.essay = null; state.draft = null;
@@ -340,14 +312,12 @@ window.VV = window.VV || {};
     var err = !c.genreId ? 'Em chọn dạng văn ở bước 1 nhé.' : !currentTopic() ? 'Em chọn hoặc nhập đề bài ở bước 2 nhé.' : !c.hintTypes.length ? 'Em chọn ít nhất một cách gợi ý ở bước 3 nhé.' : '';
     $('#choose-error').textContent = err;
     if (err) return;
-    VV.ai.isAvailable().then(function (online) {
-      ui.loading(true, online ? 'Cô AI đang gieo hạt gợi ý cho em… 🌱' : 'Đang lấy gợi ý từ túi hạt giống (ngoại tuyến)…');
-      return VV.ai.generateDraft({
+    Promise.resolve().then(function () {
+      return VV.coach.draft({
         genreId: c.genreId, topic: currentTopic(), themeName: (VV.themeById(c.themeId) || {}).name,
         hintTypes: c.hintTypes, request: c.request, studentName: state.student && state.student.name
       });
     }).then(function (d) {
-      ui.loading(false);
       state.draft = d;
       // Tạo lại bản thảo cho bài đang viết dở cùng đề thì cập nhật luôn
       if (state.essay && state.essay.status === 'writing' && state.essay.topic === currentTopic() && state.essay.genreId === c.genreId) {
@@ -357,7 +327,6 @@ window.VV = window.VV || {};
       renderDraft();
       ui.show('s-draft');
     }).catch(function (e) {
-      ui.loading(false);
       console.error(e);
       ui.toast('Có lỗi khi tạo gợi ý. Em thử lại nhé.', 'err');
     });
@@ -457,10 +426,8 @@ window.VV = window.VV || {};
   function renderDraft() {
     var d = state.draft, g = genreOf(state.current.genreId);
     $('#draft-title').textContent = d.title || 'Bản thảo gợi ý';
-    $('#draft-meta').innerHTML = '<span class="src-badge ' + (d.source === 'offline' ? 'offline' : '') + '">' + (d.source === 'ai' ? '✨ Gợi ý từ AI' : '🌱 Gợi ý ngoại tuyến') + '</span> · ' +
-      esc(g.name) + ' · Đề: ' + esc(currentTopic());
+    $('#draft-meta').innerHTML = '<span class="src-badge">🌱 Gợi ý theo SGK</span> · ' + esc(g.name) + ' · Đề: ' + esc(currentTopic());
     var html = '';
-    if (d.aiError) html += '<div class="note warn">⚠️ ' + esc(d.aiError) + ' Vườn Văn đang dùng gợi ý có sẵn theo SGK.</div>';
     if (d.intro) html += '<div class="bubble">👩‍🏫 ' + esc(d.intro) + '</div>';
     html += '<div class="draft-grid">';
     if (d.vocabulary && d.vocabulary.length) html += section('📚', 'Vốn từ', vocabHtml(d.vocabulary));
@@ -469,8 +436,8 @@ window.VV = window.VV || {};
     if (d.outline && d.outline.length) html += section('📝', 'Dàn ý', outlineHtml(d.outline));
     html += '</div>';
     if (d.mindmap && d.mindmap.branches && d.mindmap.branches.length) html += section('🗺️', 'Sơ đồ tư duy', '<div class="mindmap-wrap">' + VV.renderMindmap(d.mindmap) + '</div>');
-    if (d.sample) html += section('📖', 'Bài tham khảo', '<p class="note info">Em đọc để học cách viết, rồi tự viết bằng lời của mình nhé – không chép lại!</p><div class="sample">' + esc(d.sample) + '</div>');
-    else if (d.sampleNote) html += section('📖', 'Bài tham khảo', '<p class="muted">' + esc(d.sampleNote) + '</p>');
+    if (d.sample) html += section('📖', 'Bài tham khảo', '<p class="note info">Em đọc để học cách viết, rồi tự viết bằng lời của mình nhé – không chép lại!</p>' +
+      (d.sampleTopic && d.sampleTopic !== currentTopic() ? '<p class="small muted">Bài tham khảo cho đề: <b>' + esc(d.sampleTopic) + '</b></p>' : '') + '<div class="sample">' + esc(d.sample) + '</div>');
     if (d.tips && d.tips.length) html += section('⭐', 'Lưu ý', '<ul class="clean">' + d.tips.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>');
     $('#draft-body').innerHTML = html;
   }
@@ -543,7 +510,6 @@ window.VV = window.VV || {};
     });
     $('#btn-save').addEventListener('click', function () { saveEssay().then(function () { ui.toast('Đã lưu nháp 💾', 'ok'); }); });
     $('#btn-check').addEventListener('click', runCheck);
-    $('#btn-check-ai').addEventListener('click', runDeepCheck);
     $('#btn-read-essay').addEventListener('click', function () { VV.speak(ed.value || 'Em chưa viết gì.'); });
     $('#btn-submit').addEventListener('click', submitEssay);
     $('#btn-revise').addEventListener('click', function () {
@@ -569,28 +535,27 @@ window.VV = window.VV || {};
     state.essay.content = text;
     state.essay.wordCount = VV.spell.stats(text).words;
     return VV.db.put('essays', state.essay).then(function () {
-      $('#save-state').textContent = '💾 Đã lưu lúc ' + VV.fmt.dateTime(Date.now()).slice(0, 5) + (VV.sync.isConnected() ? ' · đồng bộ đám mây' : ' · trên máy');
+      $('#save-state').textContent = '💾 Đã lưu lúc ' + VV.fmt.dateTime(Date.now()).slice(0, 5) + ' · trên máy';
     });
   }
 
   /* ----- Kiểm tra chính tả ----- */
-  var lastIssues = [], aiIssues = [];
+  var lastIssues = [];
 
   function runCheck() {
     var g = genreOf(state.essay.genreId);
     var text = $('#editor').value.normalize('NFC');
     if ($('#editor').value !== text) $('#editor').value = text;
     lastIssues = VV.spell.check(text, { kind: g.kind }).filter(function (i) { return !state.ignored[i.original + '|' + i.start]; });
-    aiIssues = [];
     renderCheck(VV.spell.style(text));
   }
 
-  function renderCheck(styleNotes, aiNote) {
+  function renderCheck(styleNotes) {
     var p = $('#check-panel');
     p.hidden = false;
     var text = $('#editor').value;
     var html = '<h4>🔍 Kết quả kiểm tra</h4>';
-    if (!lastIssues.length && !aiIssues.length) html += '<p class="note info">🎉 Không tìm thấy lỗi chính tả, dấu câu. Em giỏi lắm!</p>';
+    if (!lastIssues.length) html += '<p class="note info">🎉 Không tìm thấy lỗi chính tả, dấu câu. Em giỏi lắm!</p>';
     if (lastIssues.length) {
       html += '<div class="row-end" style="justify-content:space-between"><b>' + lastIssues.length + ' chỗ cần xem lại</b><button type="button" class="btn btn-small btn-primary" data-fixall>✔ Sửa tất cả</button></div>';
       // Lỗi dấu cách: hiện dấu cách thành "␣" để em nhìn thấy
@@ -610,13 +575,6 @@ window.VV = window.VV || {};
       marked += esc(text.slice(pos));
       html += '<details><summary>Xem lỗi được tô màu trong bài</summary><div class="marked">' + marked + '</div></details>';
     }
-    if (aiIssues.length) {
-      html += '<h4>🤖 AI góp ý thêm</h4>' + aiIssues.map(function (is, i) {
-        return '<div class="issue"><div><span class="from">' + esc(is.original) + '</span> → <span class="to">' + esc(is.suggestion) + '</span></div>' +
-          '<div class="acts"><button type="button" class="btn btn-small" data-aifix="' + i + '">Sửa</button></div><div class="why">' + esc(is.explanation) + '</div></div>';
-      }).join('');
-    }
-    if (aiNote) html += '<p class="note warn">' + esc(aiNote) + '</p>';
     if (styleNotes && styleNotes.length) html += '<h4>✨ Gợi ý diễn đạt</h4><ul class="clean">' + styleNotes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
     p.innerHTML = html;
   }
@@ -633,16 +591,6 @@ window.VV = window.VV || {};
     } else if (ev.target.closest('[data-fixall]')) {
       ed.value = VV.spell.applyAll(ed.value, lastIssues);
       afterFix();
-    } else if ((b = ev.target.closest('[data-aifix]'))) {
-      var ai = aiIssues[+b.getAttribute('data-aifix')];
-      var idx = ed.value.indexOf(ai.original);
-      if (idx >= 0) {
-        ed.value = ed.value.slice(0, idx) + ai.suggestion + ed.value.slice(idx + ai.original.length);
-        aiIssues.splice(+b.getAttribute('data-aifix'), 1);
-        ed.dispatchEvent(new Event('input'));
-        var keep = aiIssues;
-        runCheck(); aiIssues = keep; renderCheck(VV.spell.style(ed.value));
-      } else ui.toast('Không tìm thấy đoạn này nữa – có lẽ em đã sửa rồi.', 'warn');
     }
   }
 
@@ -650,32 +598,6 @@ window.VV = window.VV || {};
     $('#editor').dispatchEvent(new Event('input'));
     runCheck();
     ui.toast('Đã sửa ✔', 'ok', 1500);
-  }
-
-  function runDeepCheck() {
-    var text = $('#editor').value.trim();
-    if (text.split(/\s+/).length < 5) { ui.toast('Em viết thêm vài câu rồi hãy kiểm tra nhé.', 'warn'); return; }
-    VV.ai.isAvailable().then(function (ok) {
-      if (!ok) {
-        runCheck();
-        renderCheck(VV.spell.style(text), navigator.onLine ? 'Chưa có khoá AI nên chỉ kiểm tra bằng bộ luật có sẵn.' : 'Đang ngoại tuyến nên chỉ kiểm tra bằng bộ luật có sẵn. Khi có mạng, em bấm lại nhé.');
-        return;
-      }
-      ui.loading(true, 'Cô AI đang đọc bài của em… 🔎');
-      VV.ai.deepCheck($('#editor').value, state.essay.genreId).then(function (issues) {
-        ui.loading(false);
-        runCheck();
-        // bỏ các lỗi AI trùng với bộ luật
-        aiIssues = issues.filter(function (a) {
-          return a.original && a.original !== a.suggestion && !lastIssues.some(function (l) { return l.original === a.original; });
-        });
-        renderCheck(VV.spell.style($('#editor').value));
-      }).catch(function (e) {
-        ui.loading(false);
-        runCheck();
-        renderCheck(VV.spell.style(text), VV.ai.friendlyError(e) + ' Đã kiểm tra bằng bộ luật có sẵn.');
-      });
-    });
   }
 
   /* ----- Nộp bài & chấm ----- */
@@ -686,29 +608,21 @@ window.VV = window.VV || {};
     if (words < 15) { ui.toast('Bài còn ngắn quá, em viết thêm nhé!', 'warn'); return; }
     var go = function () {
       saveEssay().then(function () {
-        return VV.ai.isAvailable();
-      }).then(function (online) {
-        ui.loading(true, online ? 'Cô AI đang chấm bài cho em… ⭐' : 'Đang chấm tạm (ngoại tuyến)…');
-        return VV.ai.grade({ genreId: g.id, topic: state.essay.topic, request: state.essay.request, content: text });
-      }).then(function (grade) {
-        ui.loading(false);
+        var grade = VV.coach.grade({ genreId: g.id, topic: state.essay.topic, request: state.essay.request, content: text });
         var e = state.essay;
         if (e.grade) e.history = (e.history || []).concat([{ at: e.submittedAt, total: e.grade.total, words: e.wordCount }]);
         e.grade = grade;
         e.content = text;
         e.spellCount = VV.spell.check(text, { kind: g.kind }).length;
-        e.status = grade.source === 'ai' ? 'graded' : 'submitted';
-        e.pendingAI = grade.source !== 'ai';
+        e.status = 'graded';
         e.submittedAt = Date.now();
         e.teacherReviewed = false;
         return VV.db.put('essays', e);
       }).then(function (e) {
-        VV.sync.pushNow();
         state.current.assignmentId = null;
         renderResult(e);
         ui.show('s-result');
       }).catch(function (err) {
-        ui.loading(false);
         console.error(err);
         ui.toast('Có lỗi khi nộp bài, bài vẫn được lưu nháp. Em thử lại nhé.', 'err');
       });
@@ -725,19 +639,18 @@ window.VV = window.VV || {};
     var html = '<div class="card"><div class="result-top">' +
       '<div class="score-ring" style="--p:' + (total * 10) + '"><div><div><b>' + VV.fmt.score(total) + '</b><br><small>/ 10 điểm</small></div></div></div>' +
       '<div><span class="level">' + esc(r.level) + '</span>' +
-      (e.teacherScore != null && e.teacherScore !== '' ? ' <span class="tag ok">Điểm của thầy cô</span>' : ' <span class="tag">' + (r.source === 'ai' ? '✨ AI chấm' : '🌱 Điểm tạm (ngoại tuyến)') + '</span>') +
+      (e.teacherScore != null && e.teacherScore !== '' ? ' <span class="tag ok">Điểm của thầy cô</span>' : ' <span class="tag">🌱 Chấm tự động</span>') +
       '<h3 style="margin-top:.5rem">' + esc(g.icon + ' ' + g.name) + '</h3><p class="muted">' + esc(e.topic) + ' · ' + (e.wordCount || 0) + ' chữ · nộp ' + esc(VV.fmt.dateTime(e.submittedAt)) + '</p></div></div>';
     html += VV.RUBRIC.map(function (c) {
       var v = r.scores[c.id];
       return '<div class="crit"><span title="' + esc(c.desc) + '">' + esc(c.name) + '</span><div class="bar"><div style="width:' + (v / c.max * 100) + '%"></div></div><b>' + VV.fmt.score(v) + '/' + VV.fmt.score(c.max) + '</b></div>';
     }).join('') + '</div>';
-    if (r.source !== 'ai') html += '<div class="note warn">🌱 ' + esc(r.comment) + (r.aiError ? ' (' + esc(r.aiError) + ')' : '') + '</div>';
     if (r.onTopic === false) html += '<div class="note warn">⚠️ Bài viết có vẻ chưa đúng đề. Em đọc lại đề bài nhé.</div>';
     if (e.teacherComment || (e.teacherScore != null && e.teacherScore !== '')) {
       html += '<div class="teacher-note"><b>👩‍🏫 Thầy cô nhận xét:</b> ' + esc(e.teacherComment || '') + (e.teacherScore != null && e.teacherScore !== '' ? ' <b>(Điểm: ' + VV.fmt.score(e.teacherScore) + ')</b>' : '') + '</div>';
     }
     html += '<div class="draft-grid" style="margin-top:1rem">';
-    if (r.source === 'ai' && r.comment) html += '<section class="card"><h3>💬 Lời nhận xét</h3><p>' + esc(r.comment) + '</p></section>';
+    if (r.comment) html += '<section class="card"><h3>💬 Lời nhận xét</h3><p>' + esc(r.comment) + '</p></section>';
     if (r.strengths && r.strengths.length) html += '<section class="card"><h3>🌟 Em đã làm tốt</h3><ul class="clean">' + r.strengths.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></section>';
     if (r.improvements && r.improvements.length) html += '<section class="card"><h3>🌱 Em cần cố gắng</h3><ul class="clean">' + r.improvements.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></section>';
     if (r.corrections && r.corrections.length) html += '<section class="card"><h3>✏️ Sửa lỗi</h3>' + r.corrections.map(function (c) {
@@ -767,7 +680,6 @@ window.VV = window.VV || {};
   function statusTag(e) {
     if (e.status === 'writing') return '<span class="tag write">Đang viết</span>';
     if (e.teacherReviewed) return '<span class="tag ok">Thầy cô đã xem</span>';
-    if (e.pendingAI) return '<span class="tag wait">Chờ AI chấm lại</span>';
     return '<span class="tag ok">Đã chấm</span>';
   }
 
@@ -856,49 +768,40 @@ window.VV = window.VV || {};
     });
   }
 
-  /* ================= ĐỒNG BỘ, HÀNG ĐỢI AI ================= */
-  function onRemote(ev) {
-    var d = ev.detail;
+  /* ================= TRAO ĐỔI BẰNG TỆP ================= */
+  function bindExchange() {
+    $('#btn-send-teacher').addEventListener('click', function () {
+      if (state.classCode === 'LOCAL') { ui.toast('Em đăng xuất rồi đăng nhập lại kèm mã lớp thầy cô cho để gửi bài nhé.', 'warn', 6000); return; }
+      VV.backup.exportStudent(state.student).then(function (n) {
+        ui.dialog('Gửi bài cho thầy cô',
+          '<p>Vườn Văn đã lưu tệp chứa <b>' + n + ' bài đã nộp</b> của em vào thư mục <b>Tải xuống</b> (Downloads) của máy.</p>' +
+          '<p>Em nhờ bố mẹ gửi tệp đó cho thầy cô (qua Zalo, email…) hoặc chép vào USB nộp cho thầy cô nhé.</p>',
+          [{ label: 'Em hiểu rồi', cls: 'btn-primary' }]);
+      });
+    });
+    $('#file-receive').addEventListener('change', function (ev) {
+      var file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      VV.backup.importFile(file, { role: 'student', classCode: state.classCode, studentId: state.student.id }).then(function (c) {
+        var msg = c.assignments || c.essays ? 'Đã nhận ' + c.assignments + ' bài tập mới và ' + c.essays + ' lời nhận xét 💌' : 'Không có gì mới trong tệp này cho em.';
+        ui.toast(msg, c.assignments || c.essays ? 'ok' : 'warn', 5000);
+        if (c.assignments) VV.notify.checkStudent(state.student);
+      }).catch(function (e) { ui.toast('Không mở được tệp: ' + e.message, 'err', 5000); });
+    });
+  }
+
+  /* Dữ liệu vừa được thêm từ tệp → vẽ lại màn hình đang xem */
+  function onImported(ev) {
+    if (!ev.detail || ev.detail.store !== 'import') return;
     if (state.role === 'student') {
       updateTaskBadge();
-      if (d.store === 'assignments') VV.notify.checkStudent(state.student);
-      if (d.store === 'essays') {
-        d.changes.forEach(function (c) {
-          if (c.row.teacherReviewed && c.row.studentId === state.student.id) ui.toast('👩‍🏫 Thầy cô vừa nhận xét bài "' + c.row.topic + '"', 'ok', 6000);
-          if (state.essay && state.essay.id === c.row.id && state.screen === 's-result') renderResult(c.row);
-        });
-      }
       if (state.screen === 's-mine') renderMine();
       if (state.screen === 's-tasks') renderTasks();
     }
-    if (state.role === 'teacher' && VV.teacher) { VV.teacher.onRemote(d); processPending(); }
+    if (state.role === 'teacher' && VV.teacher) VV.teacher.refresh();
   }
 
-  var pendingRunning = false;
-  /* Chấm lại bằng AI các bài đã chấm tạm khi ngoại tuyến (máy nào có khoá AI cũng làm được, kể cả máy giáo viên) */
-  function processPending() {
-    if (pendingRunning) return;
-    VV.ai.isAvailable().then(function (ok) {
-      if (!ok) return;
-      pendingRunning = true;
-      return VV.db.all('essays').then(function (rows) {
-        var list = rows.filter(function (e) {
-          return e.pendingAI && e.status !== 'writing' && (state.role === 'teacher' ? e.classCode === state.classCode : state.student && e.studentId === state.student.id);
-        });
-        return list.reduce(function (p, e) {
-          return p.then(function () {
-            return VV.ai.gradeAIOnly({ genreId: e.genreId, topic: e.topic, request: e.request, content: e.content }).then(function (grade) {
-              e.grade = grade; e.pendingAI = false; e.status = 'graded';
-              return VV.db.put('essays', e).then(function () {
-                if (state.role === 'student') ui.toast('✨ AI đã chấm lại bài "' + e.topic + '": ' + VV.fmt.score(grade.total) + ' điểm', 'ok', 5000);
-              });
-            }).catch(function (err) { console.warn('pending grade', err); });
-          });
-        }, Promise.resolve());
-      });
-    }).then(function () { pendingRunning = false; }, function () { pendingRunning = false; });
-  }
-  VV.processPending = processPending;
   VV.openEssayResult = function (e) { renderResult(e); ui.show('s-result'); };
 
   document.addEventListener('DOMContentLoaded', init);

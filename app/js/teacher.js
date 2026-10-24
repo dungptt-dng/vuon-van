@@ -12,10 +12,10 @@ VV.teacher = (function () {
 
   /* ---------- Đăng nhập giáo viên ---------- */
   function askLogin() {
-    Promise.all([VV.db.getKV('teacherPin', DEFAULT_PIN), VV.db.getKV('teacherClass', (VV.CONFIG && VV.CONFIG.defaultClassCode) || '')]).then(function (r) {
+    Promise.all([VV.db.getKV('teacherPin', DEFAULT_PIN), VV.db.getKV('teacherClass', '')]).then(function (r) {
       var d = ui().dialog('Đăng nhập giáo viên',
         '<label class="field-label" for="t-class">Mã lớp</label><input id="t-class" type="text" maxlength="24" value="' + esc(r[1]) + '" placeholder="Ví dụ: 4A-HOAMAI" autocapitalize="characters">' +
-        '<p class="small muted">Học sinh nhập đúng mã lớp này khi đăng nhập để bài làm được gửi về thầy cô.</p>' +
+        '<p class="small muted">Học sinh nhập đúng mã lớp này khi đăng nhập để bài làm được ghép vào lớp của thầy cô.</p>' +
         '<label class="field-label" for="t-pin">Mã PIN giáo viên</label><input id="t-pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off">' +
         (r[0] === DEFAULT_PIN ? '<p class="small muted">Lần đầu dùng, mã PIN là <b>1234</b>. Thầy cô nhớ đổi PIN trong mục Cài đặt.</p>' : '') +
         '<p id="t-err" class="form-error" role="alert"></p>',
@@ -48,11 +48,7 @@ VV.teacher = (function () {
     bindTabs();
     ui().show('s-teacher');
     showTab(state.tab);
-    VV.sync.start({ classCode: classCode, role: 'teacher' }).then(function () {
-      VV.sync.autoBackup({ role: 'teacher', deviceId: VV.state.deviceId });
-      VV.processPending();
-      refresh();
-    });
+    VV.backup.auto({ role: 'teacher' });
     VV.report.autoPeriodic(classCode).then(function (rec) {
       if (rec) VV.notify.show('Đã tạo báo cáo định kỳ', rec.data.label + ' – ' + rec.data.totalEssays + ' bài', 'auto-report');
     });
@@ -93,7 +89,6 @@ VV.teacher = (function () {
   function statusTag(e) {
     if (e.status === 'writing') return '<span class="tag write">Đang viết</span>';
     if (e.teacherReviewed) return '<span class="tag ok">Đã nhận xét</span>';
-    if (e.pendingAI) return '<span class="tag wait">Chờ AI chấm</span>';
     return '<span class="tag wait">Chờ xem</span>';
   }
 
@@ -105,30 +100,59 @@ VV.teacher = (function () {
       var week = submitted.filter(function (e) { return (e.submittedAt || 0) >= weekAgo; });
       var scores = week.map(VV.report.finalScore).filter(function (x) { return x != null; });
       var waiting = submitted.filter(function (e) { return !e.teacherReviewed; });
-      var st = VV.sync.status();
       var html = '<div class="stat-grid">' +
         '<div class="stat"><b>' + d.students.length + '</b><span>học sinh</span></div>' +
         '<div class="stat"><b>' + week.length + '</b><span>bài nộp 7 ngày qua</span></div>' +
         '<div class="stat"><b>' + VV.fmt.score(scores.length ? scores.reduce(function (a, b) { return a + b; }, 0) / scores.length : null) + '</b><span>điểm TB 7 ngày</span></div>' +
         '<div class="stat"><b>' + waiting.length + '</b><span>bài chờ thầy cô xem</span></div></div>';
-      html += '<div class="note ' + (st.state === 'error' ? 'warn' : 'info') + '">☁️ <b>Đồng bộ:</b> ' + esc(st.message) + (st.lastSync ? ' · lần cuối ' + VV.fmt.ago(st.lastSync) : '') +
-        (st.state === 'off' ? ' – <button class="link-btn" data-tabgo="t-settings">Cài đặt đồng bộ</button>' : '') + '</div>';
+      html += '<div class="card"><h3>📮 Trao đổi bài với học sinh</h3>' +
+        '<p class="small muted">Học sinh làm bài ngay trên máy này thì bài tự hiện ở đây. Học sinh làm ở máy khác (ở nhà, máy tính bảng…) thì bấm <b>📤 Gửi bài cho thầy cô</b> trong mục "Bài của em" để lưu ra tệp và gửi thầy cô qua Zalo, email hoặc USB.</p>' +
+        '<div class="row-end" style="justify-content:flex-start">' +
+        '<label class="btn btn-primary" for="ov-import">📥 Nhận bài của học sinh (mở tệp)</label><input id="ov-import" type="file" accept=".json,application/json" multiple hidden>' +
+        '<button class="btn" id="ov-export">📤 Gửi bài tập & nhận xét cho cả lớp</button></div></div>';
       var recent = submitted.sort(function (a, b) { return (b.submittedAt || 0) - (a.submittedAt || 0); }).slice(0, 10);
-      html += '<div class="card"><h3>🆕 Bài nộp gần đây <small class="muted">(cập nhật tức thì khi học sinh nộp)</small></h3>' +
+      html += '<div class="card"><h3>🆕 Bài nộp gần đây</h3>' +
         (recent.length ? essayTable(recent) : '<p class="empty">Chưa có bài nộp nào.</p>') + '</div>';
       $('#t-overview').innerHTML = html;
       bindEssayRows($('#t-overview'), d.essays);
-      $$('[data-tabgo]', $('#t-overview')).forEach(function (b) { b.addEventListener('click', function () { showTab(b.getAttribute('data-tabgo')); }); });
+      $('#ov-import').addEventListener('change', importStudentFiles);
+      $('#ov-export').addEventListener('click', exportClassFile);
+    });
+  }
+
+  /* Nhận một hoặc nhiều tệp bài làm học sinh gửi */
+  function importStudentFiles(ev) {
+    var files = Array.prototype.slice.call(ev.target.files || []);
+    ev.target.value = '';
+    if (!files.length) return;
+    var total = 0, failed = [];
+    files.reduce(function (p, f) {
+      return p.then(function () {
+        return VV.backup.importFile(f, { role: 'teacher' }).then(function (c) { total += c.essays; }, function () { failed.push(f.name); });
+      });
+    }, Promise.resolve()).then(function () {
+      ui().toast(total ? 'Đã nhận ' + total + ' bài mới/cập nhật 📬' : 'Không có bài mới trong tệp.', total ? 'ok' : 'warn', 5000);
+      if (failed.length) ui().toast('Không đọc được: ' + failed.join(', '), 'err', 7000);
+      refresh();
+    });
+  }
+
+  function exportClassFile() {
+    VV.backup.exportClass(state.classCode).then(function (n) {
+      ui().dialog('Gửi bài tập & nhận xét',
+        '<p>Vườn Văn đã lưu tệp gồm <b>' + n.assignments + ' bài tập</b> và <b>' + n.essays + ' bài đã nhận xét</b> của lớp ' + esc(state.classCode) + ' vào thư mục <b>Tải xuống</b> (Downloads).</p>' +
+        '<p>Thầy cô gửi tệp này cho cả lớp (nhóm Zalo, email…). Học sinh vào mục <b>Bài tập → 📥 Nhận bài tập từ tệp</b> để nhận bài tập mới, điểm và lời nhận xét của mình (mỗi em chỉ thấy bài của mình).</p>',
+        [{ label: 'Đã hiểu', cls: 'btn-primary' }]);
     });
   }
 
   function essayTable(list) {
-    return '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ngày</th><th>Học sinh</th><th>Dạng văn</th><th>Đề bài</th><th>Số chữ</th><th>Điểm AI</th><th>Điểm GV</th><th>Trạng thái</th></tr></thead><tbody>' +
+    return '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ngày</th><th>Học sinh</th><th>Dạng văn</th><th>Đề bài</th><th>Số chữ</th><th>Điểm tự chấm</th><th>Điểm GV</th><th>Trạng thái</th></tr></thead><tbody>' +
       list.map(function (e) {
         return '<tr class="click" data-essay="' + e.id + '" tabindex="0"><td>' + esc(VV.fmt.dateTime(e.submittedAt || e.updatedAt)) + '</td><td><b>' + esc(e.studentName) + '</b></td><td>' + esc(genreName(e.genreId)) +
-          '</td><td>' + esc(e.topic.length > 60 ? e.topic.slice(0, 58) + '…' : e.topic) + '</td><td>' + (e.wordCount || 0) + '</td><td>' + (e.grade ? VV.fmt.score(e.grade.total) + (e.grade.source !== 'ai' ? '*' : '') : '–') +
+          '</td><td>' + esc(e.topic.length > 60 ? e.topic.slice(0, 58) + '…' : e.topic) + '</td><td>' + (e.wordCount || 0) + '</td><td>' + (e.grade ? VV.fmt.score(e.grade.total) : '–') +
           '</td><td>' + (e.teacherScore != null && e.teacherScore !== '' ? VV.fmt.score(e.teacherScore) : '–') + '</td><td>' + statusTag(e) + '</td></tr>';
-      }).join('') + '</tbody></table></div><p class="small muted">* điểm tạm khi học sinh làm bài ngoại tuyến, AI sẽ chấm lại khi có mạng.</p>';
+      }).join('') + '</tbody></table></div>';
   }
 
   function bindEssayRows(root, essays) {
@@ -145,26 +169,16 @@ VV.teacher = (function () {
     var body = '<p class="muted">' + esc(e.studentName) + ' · ' + esc(genreName(e.genreId)) + ' · ' + esc(VV.fmt.dateTime(e.submittedAt || e.updatedAt)) + ' · ' + (e.wordCount || 0) + ' chữ</p>' +
       '<p><b>Đề:</b> ' + esc(e.topic) + (e.request ? '<br><b>Yêu cầu riêng của em:</b> ' + esc(e.request) : '') + '</p>' +
       '<div class="essay-view">' + esc(e.content || '(chưa có nội dung)') + '</div>' +
-      (e.grade ? '<details style="margin-top:.8rem"><summary><b>Kết quả AI chấm: ' + VV.fmt.score(e.grade.total) + ' điểm</b></summary>' + VV.renderGrade(Object.assign({}, e, { teacherScore: null, teacherComment: '' })) + '</details>' : '') +
+      (e.grade ? '<details style="margin-top:.8rem"><summary><b>Kết quả chấm tự động: ' + VV.fmt.score(e.grade.total) + ' điểm</b></summary>' + VV.renderGrade(Object.assign({}, e, { teacherScore: null, teacherComment: '' })) + '</details>' : '') +
       (e.history && e.history.length ? '<p class="small muted">Lịch sử nộp: ' + e.history.map(function (h) { return VV.fmt.score(h.total) + 'đ (' + VV.fmt.date(h.at) + ')'; }).join(' → ') + ' → ' + VV.fmt.score(e.grade && e.grade.total) + 'đ</p>' : '') +
-      '<div class="form-grid"><div><label class="field-label" for="tv-score">Điểm của thầy cô (để trống = dùng điểm AI)</label>' +
+      '<div class="form-grid"><div><label class="field-label" for="tv-score">Điểm của thầy cô (để trống = dùng điểm tự chấm)</label>' +
       '<input id="tv-score" type="number" min="0" max="10" step="0.25" value="' + (e.teacherScore != null ? esc(e.teacherScore) : '') + '"></div></div>' +
       '<label class="field-label" for="tv-comment">Lời nhận xét gửi em</label><textarea id="tv-comment" rows="3" placeholder="Ví dụ: Bài tả chú mèo rất sinh động! Em chú ý viết hoa đầu câu nhé.">' + esc(e.teacherComment || '') + '</textarea>';
     ui().dialog('Bài của ' + e.studentName, body, [
       { label: '🗑 Xoá bài', cls: 'btn-danger', onClick: function (close) {
-        ui().confirm('Xoá bài làm', 'Xoá bài "' + esc(e.topic) + '" của ' + esc(e.studentName) + '? Bài sẽ bị xoá trên mọi thiết bị.', 'Xoá').then(function (ok) {
+        ui().confirm('Xoá bài làm', 'Xoá bài "' + esc(e.topic) + '" của ' + esc(e.studentName) + '?', 'Xoá').then(function (ok) {
           if (ok) VV.db.remove('essays', e.id).then(function () { ui().toast('Đã xoá bài.', 'ok'); refresh(); });
         });
-        return false;
-      } },
-      { label: '🤖 Chấm lại bằng AI', onClick: function () {
-        if (!e.content) return;
-        ui().loading(true, 'AI đang chấm lại…');
-        VV.ai.gradeAIOnly({ genreId: e.genreId, topic: e.topic, request: e.request, content: e.content }).then(function (g) {
-          e.grade = g; e.pendingAI = false; e.status = 'graded';
-          return VV.db.put('essays', e);
-        }).then(function () { ui().loading(false); ui().toast('AI đã chấm lại.', 'ok'); refresh(); openEssay(e); })
-          .catch(function (err) { ui().loading(false); ui().toast(VV.ai.friendlyError(err), 'err'); });
         return false;
       } },
       { label: '💾 Lưu nhận xét', cls: 'btn-primary', onClick: function () {
@@ -174,7 +188,7 @@ VV.teacher = (function () {
         e.teacherComment = $('#tv-comment').value.trim();
         e.teacherReviewed = true;
         e.reviewedAt = Date.now();
-        VV.db.put('essays', e).then(VV.sync.pushNow).then(function () { ui().toast('Đã lưu và gửi nhận xét tới học sinh 💌', 'ok'); refresh(); });
+        VV.db.put('essays', e).then(function () { ui().toast('Đã lưu nhận xét 💌', 'ok'); refresh(); });
       } }
     ]);
   }
@@ -247,7 +261,7 @@ VV.teacher = (function () {
     data().then(function (d) {
       var due = new Date(Date.now() + 3 * 86400000); due.setHours(20, 0, 0, 0);
       var local = due.getFullYear() + '-' + VV.fmt.pad(due.getMonth() + 1) + '-' + VV.fmt.pad(due.getDate()) + 'T20:00';
-      var html = '<div class="card"><h3>📮 Giao bài tập mới</h3><p class="small muted">Bài tập được gửi ngay tới máy của học sinh trong lớp (kèm thông báo nhắc) khi có đồng bộ đám mây.</p><div class="form-grid">' +
+      var html = '<div class="card"><h3>📮 Giao bài tập mới</h3><p class="small muted">Học sinh dùng chung máy này sẽ thấy bài tập ngay. Với máy khác, thầy cô bấm <b>📤 Gửi bài tập & nhận xét cho cả lớp</b> ở mục Tổng quan rồi gửi tệp cho học sinh.</p><div class="form-grid">' +
         '<div><label class="field-label" for="as-genre">Dạng văn</label><select id="as-genre">' + VV.GENRES.map(function (g) { return '<option value="' + g.id + '">' + g.icon + ' ' + esc(g.name) + '</option>'; }).join('') + '</select></div>' +
         '<div><label class="field-label" for="as-due">Hạn nộp</label><input id="as-due" type="datetime-local" value="' + local + '"></div></div>' +
         '<label class="field-label" for="as-topic">Đề bài</label><select id="as-topic"></select>' +
@@ -275,8 +289,8 @@ VV.teacher = (function () {
         var topic = $('#as-topic-custom').value.trim() || $('#as-topic').value;
         if (!dueAt || isNaN(dueAt)) { ui().toast('Thầy cô chọn hạn nộp nhé.', 'warn'); return; }
         var a = { id: VV.db.uid('as'), classCode: state.classCode, genreId: $('#as-genre').value, topic: topic, title: topic, note: $('#as-note').value.trim(), dueAt: dueAt, createdAt: Date.now() };
-        VV.db.put('assignments', a).then(VV.sync.pushNow).then(function () {
-          ui().toast(VV.sync.isConnected() ? 'Đã giao bài – học sinh sẽ nhận được thông báo 🔔' : 'Đã lưu bài tập. (Chưa bật đồng bộ đám mây nên học sinh ở máy khác chưa nhận được.)', VV.sync.isConnected() ? 'ok' : 'warn', 6000);
+        VV.db.put('assignments', a).then(function () {
+          ui().toast('Đã giao bài 🔔 Học sinh ở máy khác nhận qua tệp "Gửi bài tập & nhận xét".', 'ok', 6000);
           renderAssign();
         });
       });
@@ -313,7 +327,7 @@ VV.teacher = (function () {
         '<button class="btn btn-primary" id="rp-make">Tạo báo cáo</button></div>' +
         '<div class="toolbar"><div><label class="field-label" for="rp-auto">Báo cáo định kỳ tự động</label><select id="rp-auto">' +
         [['week', 'Hằng tuần'], ['month', 'Hằng tháng'], ['off', 'Tắt']].map(function (o) { return '<option value="' + o[0] + '"' + (r[0] === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
-        '</select></div><p class="small muted" style="flex:3">Khi đến kỳ, Vườn Văn tự lập báo cáo lúc thầy cô mở trang giáo viên, lưu vào danh sách bên dưới (đồng bộ lên đám mây) và gửi thông báo.</p></div></div>' +
+        '</select></div><p class="small muted" style="flex:3">Khi đến kỳ, Vườn Văn tự lập báo cáo lúc thầy cô mở trang giáo viên, lưu vào danh sách bên dưới và gửi thông báo.</p></div></div>' +
         '<div id="rp-out"></div>' +
         '<div class="card no-print"><h3>🗂 Báo cáo đã lưu</h3>' + (saved.length ? '<div class="list">' + saved.map(function (s) {
           return '<div class="item"><span class="ic">' + (s.auto ? '⏰' : '📄') + '</span><div class="grow"><div class="t">' + esc(s.data.label) + '</div><div class="small muted">Lập lúc ' + esc(VV.fmt.dateTime(s.createdAt)) + ' · ' + s.data.totalEssays + ' bài · điểm TB ' + VV.fmt.score(s.data.avg) + '</div></div>' +
@@ -357,37 +371,13 @@ VV.teacher = (function () {
   }
 
   /* ---------- Cài đặt ---------- */
-  function parseFirebaseConfig(txt) {
-    var m = (txt || '').match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    var s = m[0].replace(/\/\/.*$/gm, '').replace(/([{,]\s*)([A-Za-z_][\w]*)\s*:/g, '$1"$2":').replace(/'/g, '"').replace(/,\s*}/g, '}');
-    try { var o = JSON.parse(s); return o.projectId && o.apiKey ? o : null; } catch (e) { return null; }
-  }
-
   function renderSettings() {
-    Promise.all([
-      VV.db.getKV('aiKey', ''), VV.db.getKV('aiModel', VV.ai.DEFAULT_MODEL), VV.sync.getConfig(), VV.db.getKV('lastBackupInfo', null),
-      VV.db.allRaw('backups'), VV.db.getKV('shareAiKey', false)
-    ]).then(function (r) {
-      var st = VV.sync.status();
-      var models = [['claude-opus-5-5', 'Claude Opus 5.5 – chất lượng cao nhất (khuyên dùng)'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5 – nhanh, tiết kiệm hơn'], ['claude-haiku-5-5', 'Claude Haiku 5.5 – nhanh nhất, rẻ nhất']];
-      var backups = (r[4] || []).sort(function (a, b) { return b.createdAt - a.createdAt; });
+    Promise.all([VV.db.getKV('lastBackupAt', null), VV.db.allRaw('backups')]).then(function (r) {
+      var backups = (r[1] || []).sort(function (a, b) { return b.createdAt - a.createdAt; });
       var html =
-        '<section class="card settings-sec"><h3>🤖 Trí tuệ nhân tạo (Claude)</h3>' +
-        '<p class="small muted">Dùng để tạo bản thảo gợi ý, kiểm tra chính tả sâu và chấm điểm tự động. Lấy khoá tại <b>console.anthropic.com</b> → API Keys. Không có khoá hoặc mất mạng, app vẫn chạy bằng bộ gợi ý và chấm điểm ngoại tuyến.</p>' +
-        '<div class="form-grid"><div><label class="field-label" for="se-key">Khoá API</label><input id="se-key" type="password" autocomplete="off" value="' + esc(r[0]) + '" placeholder="sk-ant-…"></div>' +
-        '<div><label class="field-label" for="se-model">Mô hình</label><select id="se-model">' + models.map(function (m) { return '<option value="' + m[0] + '"' + (r[1] === m[0] ? ' selected' : '') + '>' + m[1] + '</option>'; }).join('') + '</select></div></div>' +
-        '<label class="hint-card" style="margin-top:.8rem"><input type="checkbox" id="se-share" ' + (r[5] ? 'checked' : '') + '><b>Dùng chung khoá cho máy học sinh của lớp</b><small>Gửi khoá qua đám mây để máy học sinh cũng dùng được AI. Lưu ý: người biết mã lớp có thể đọc được khoá – chỉ bật khi thầy cô đặt giới hạn chi tiêu cho khoá trong Anthropic Console.</small></label>' +
-        '<div class="row-end"><button class="btn" id="se-test">Kiểm tra khoá</button><button class="btn btn-primary" id="se-save-ai">Lưu</button></div></section>' +
-
-        '<section class="card settings-sec"><h3>☁️ Đồng bộ thời gian thực & sao lưu đám mây (Firebase)</h3>' +
-        '<p><b>Trạng thái:</b> ' + esc(st.message) + (st.lastSync ? ' · lần cuối ' + VV.fmt.ago(st.lastSync) : '') + '</p>' +
-        '<p class="small muted">Dán cấu hình Firebase (Project settings → Your apps → Config). Nên dán vào tệp <code>js/config.js</code> để mọi máy học sinh tự kết nối. Xem tệp HUONG-DAN.md để biết cách tạo dự án miễn phí.</p>' +
-        '<label class="field-label" for="se-fb">Cấu hình Firebase</label><textarea id="se-fb" class="mono" placeholder="{ apiKey: &quot;…&quot;, authDomain: &quot;…&quot;, projectId: &quot;…&quot;, appId: &quot;…&quot; }">' + (r[2] ? esc(JSON.stringify(r[2], null, 2)) : '') + '</textarea>' +
-        '<div class="row-end"><button class="btn" id="se-sync-now">🔄 Đồng bộ ngay</button><button class="btn btn-primary" id="se-save-fb">Lưu & kết nối</button></div></section>' +
-
         '<section class="card settings-sec"><h3>💾 Sao lưu dữ liệu</h3>' +
-        '<p>Sao lưu tự động mỗi ngày (trên máy, giữ 7 bản gần nhất' + (VV.sync.isConnected() ? ' + lên đám mây' : '') + '). Lần gần nhất: <b>' + (r[3] ? esc(VV.fmt.dateTime(r[3].at)) + (r[3].cloud ? ' (đã lên đám mây)' : ' (trên máy)') : 'chưa có') + '</b></p>' +
+        '<p>Mọi dữ liệu được lưu ngay trong trình duyệt của máy này. Vườn Văn tự sao lưu mỗi ngày (giữ 7 bản gần nhất). Lần gần nhất: <b>' + (r[0] ? esc(VV.fmt.dateTime(r[0])) : 'chưa có') + '</b></p>' +
+        '<p class="small muted">Nên tải tệp sao lưu về máy (hoặc chép vào USB) định kỳ: nếu xoá dữ liệu duyệt web hay đổi máy, thầy cô mở lại tệp này để khôi phục.</p>' +
         '<div class="row-end" style="justify-content:flex-start"><button class="btn" id="se-backup">💾 Sao lưu ngay</button><button class="btn" id="se-export">⬇️ Tải tệp sao lưu (.json)</button>' +
         '<label class="btn" for="se-import">⬆️ Khôi phục từ tệp</label><input id="se-import" type="file" accept=".json,application/json" hidden></div>' +
         (backups.length ? '<p class="field-label">Bản sao lưu trên máy</p><div class="list">' + backups.map(function (b) {
@@ -403,48 +393,16 @@ VV.teacher = (function () {
         '<section class="card settings-sec"><h3>ℹ️ Về Vườn Văn</h3><p class="small">Các dạng văn, cấu trúc bài và đề gợi ý được xây dựng theo SGK Tiếng Việt 4 (bộ Kết nối tri thức với cuộc sống), tập một và tập hai. Mã lớp hiện tại: <b>' + esc(state.classCode) + '</b>.</p></section>';
       $('#t-settings').innerHTML = html;
 
-      $('#se-save-ai').addEventListener('click', function () {
-        var key = $('#se-key').value.trim(), model = $('#se-model').value, share = $('#se-share').checked;
-        Promise.all([VV.db.setKV('aiKey', key), VV.db.setKV('aiModel', model), VV.db.setKV('aiKeySource', 'manual'), VV.db.setKV('shareAiKey', share)]).then(function () {
-          if (VV.sync.isConnected()) return VV.sync.shareConfig({ aiKey: share ? key : '', aiModel: model });
-        }).then(function () { ui().toast('Đã lưu cài đặt AI.', 'ok'); VV.processPending(); }, function (e) { ui().toast('Đã lưu trên máy; chưa gửi được lên đám mây: ' + e.message, 'warn'); });
-      });
-      $('#se-test').addEventListener('click', function () {
-        var key = $('#se-key').value.trim();
-        VV.db.setKV('aiKey', key).then(function () { return VV.db.setKV('aiModel', $('#se-model').value); }).then(function () {
-          ui().loading(true, 'Đang kiểm tra khoá…');
-          return VV.ai.testKey();
-        }).then(function () { ui().loading(false); ui().toast('Khoá AI hoạt động tốt ✅', 'ok'); })
-          .catch(function (e) { ui().loading(false); ui().toast('Lỗi: ' + VV.ai.friendlyError(e), 'err', 6000); });
-      });
-      $('#se-save-fb').addEventListener('click', function () {
-        var txt = $('#se-fb').value.trim();
-        if (!txt) { VV.db.setKV('firebaseConfig', null).then(function () { ui().toast('Đã xoá cấu hình trên máy (dùng cấu hình trong config.js nếu có).', 'ok'); }); return; }
-        var cfg = parseFirebaseConfig(txt);
-        if (!cfg) { ui().toast('Cấu hình chưa đúng – cần có ít nhất apiKey và projectId.', 'err'); return; }
-        VV.db.setKV('firebaseConfig', cfg).then(function () {
-          return VV.sync.start({ classCode: state.classCode, role: 'teacher' });
-        }).then(function (ok) { ui().toast(ok ? 'Đã kết nối đám mây ☁️' : 'Chưa kết nối được – kiểm tra lại cấu hình và mạng.', ok ? 'ok' : 'warn'); renderSettings(); });
-      });
-      $('#se-sync-now').addEventListener('click', function () { VV.sync.pushNow().then(function () { ui().toast(VV.sync.status().message); renderSettings(); }); });
       $('#se-backup').addEventListener('click', function () {
-        VV.sync.localBackup(null).then(function () { return VV.sync.cloudBackup(null, VV.state.deviceId); }).then(function (cloud) {
-          return VV.db.setKV('lastBackupInfo', { at: Date.now(), cloud: !!cloud }).then(function () {
-            ui().toast(cloud ? 'Đã sao lưu lên máy và đám mây ☁️' : 'Đã sao lưu trên máy (chưa có đám mây).', 'ok'); renderSettings();
-          });
-        });
+        VV.backup.local(null).then(function () { ui().toast('Đã sao lưu trên máy 💾', 'ok'); renderSettings(); });
       });
-      $('#se-export').addEventListener('click', function () {
-        VV.db.exportAll().then(function (d) { VV.download('vuon-van-sao-luu-' + VV.fmt.dayKey(Date.now()) + '.json', JSON.stringify(d), 'application/json'); });
-      });
+      $('#se-export').addEventListener('click', function () { VV.backup.exportFull(); });
       $('#se-import').addEventListener('change', function (ev) {
         var file = ev.target.files[0];
+        ev.target.value = '';
         if (!file) return;
-        file.text().then(function (t) {
-          var json = JSON.parse(t);
-          if (json.app !== 'vuon-van') throw new Error('Không phải tệp sao lưu của Vườn Văn');
-          return VV.db.importAll(json);
-        }).then(function () { ui().toast('Đã khôi phục dữ liệu (giữ bản mới hơn nếu trùng).', 'ok'); refresh(); })
+        VV.backup.importFile(file, { role: 'teacher' })
+          .then(function () { ui().toast('Đã khôi phục dữ liệu (giữ bản mới hơn nếu trùng).', 'ok'); renderSettings(); })
           .catch(function (e) { ui().toast('Không khôi phục được: ' + e.message, 'err'); });
       });
       $$('[data-restore]').forEach(function (b) {
@@ -464,14 +422,5 @@ VV.teacher = (function () {
     });
   }
 
-  return {
-    askLogin: askLogin, enter: enter,
-    onRemote: function (d) {
-      if (d.store === 'essays') {
-        var fresh = d.changes.filter(function (c) { return c.row.status !== 'writing' && !c.row.teacherReviewed && c.row.submittedAt && Date.now() - c.row.submittedAt < 5 * 60000; });
-        if (fresh.length) VV.notify.show('Bài mới nộp', fresh.map(function (c) { return c.row.studentName; }).join(', '), 'new-essay');
-      }
-      refresh();
-    }
-  };
+  return { askLogin: askLogin, enter: enter, refresh: refresh };
 })();

@@ -1,6 +1,6 @@
 /* VƯỜN VĂN – Dữ liệu dạng văn lấy theo SGK Tiếng Việt 4 (Kết nối tri thức với cuộc sống).
    Mỗi dạng văn gồm: tham chiếu SGK, cấu trúc bài, đề gợi ý, vốn từ, lưu ý.
-   Dữ liệu này cũng là "bộ não" để app tạo gợi ý khi KHÔNG có mạng. */
+   Dữ liệu này cũng là "bộ não" để app tạo gợi ý và chấm điểm ngay trên máy (xem coach.js). */
 window.VV = window.VV || {};
 
 VV.THEMES = [
@@ -24,7 +24,7 @@ VV.HINT_TYPES = [
   { id: 'sample', name: 'Bài tham khảo', icon: '📖', desc: 'Một bài mẫu ngắn để tham khảo (không chép!)' }
 ];
 
-/* Thang điểm 10 dùng chung cho AI chấm và chấm tạm khi ngoại tuyến */
+/* Thang điểm 10 dùng để chấm tự động */
 VV.RUBRIC = [
   { id: 'structure', name: 'Bố cục', max: 2, desc: 'Đủ phần, đúng thể loại, các đoạn rõ ràng' },
   { id: 'content', name: 'Nội dung', max: 3, desc: 'Đúng đề, ý phong phú, có chi tiết cụ thể' },
@@ -378,7 +378,7 @@ VV.GENRES = [
 VV.genreById = function (id) { return VV.GENRES.find(function (g) { return g.id === id; }); };
 VV.themeById = function (id) { return VV.THEMES.find(function (t) { return t.id === id; }); };
 
-/* Kho từ theo đối tượng thường gặp – dùng khi ngoại tuyến để gợi ý sát đề hơn */
+/* Kho từ theo đối tượng thường gặp – giúp gợi ý sát đề hơn */
 VV.SUBJECT_WORDS = [
   { keys: ['mèo'], words: ['bộ ria trắng muốt', 'đôi mắt xanh biếc', 'bước đi êm ru', 'kêu meo meo', 'cuộn tròn sưởi nắng', 'vờn quả bóng len', 'móng vuốt sắc'] },
   { keys: ['chó', 'cún'], words: ['vẫy đuôi rối rít', 'cái mũi ướt lạnh', 'sủa gâu gâu', 'tai vểnh lên', 'chạy lon ton ra đón', 'canh nhà', 'trung thành'] },

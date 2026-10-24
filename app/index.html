@@ -6,12 +6,10 @@
   <title>Vườn Văn – Luyện viết văn lớp 4</title>
   <meta name="description" content="Vườn Văn giúp học sinh lớp 4 luyện viết văn theo SGK Tiếng Việt 4 Kết nối tri thức với cuộc sống.">
   <meta name="theme-color" content="#3cb043">
-  <link rel="manifest" href="manifest.webmanifest">
+  <script>if (/^https?:/.test(location.protocol)) document.write('<link rel="manifest" href="manifest.webmanifest">');</script>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -57,7 +55,6 @@
         <span class="role-pill">👩‍🏫 Giáo viên · Lớp <b id="t-class-label"></b></span>
       </nav>
       <div class="top-right">
-        <span id="net-chip" class="chip" role="status" aria-live="polite">●</span>
         <button class="icon-btn" id="btn-a11y" aria-label="Cỡ chữ và hiển thị" title="Cỡ chữ và hiển thị">Aa</button>
         <span class="who" id="who"></span>
         <button class="icon-btn" id="btn-logout" aria-label="Đăng xuất" title="Đăng xuất">⏏</button>
@@ -135,7 +132,6 @@
           <div class="editor-col">
             <div class="editor-tools" role="toolbar" aria-label="Công cụ viết">
               <button class="btn btn-small" id="btn-check">🔍 Kiểm tra chính tả</button>
-              <button class="btn btn-small" id="btn-check-ai">🤖 Kiểm tra sâu bằng AI</button>
               <button class="btn btn-small btn-ghost" id="btn-read-essay">🔊 Nghe lại bài</button>
               <span id="save-state" class="muted small" aria-live="polite"></span>
             </div>
@@ -173,7 +169,10 @@
 
       <!-- ============ BÀI CỦA EM ============ -->
       <section id="s-mine" class="screen" hidden aria-labelledby="mine-title">
-        <div class="page-head"><h2 id="mine-title">Khu vườn bài văn của em 🌳</h2></div>
+        <div class="page-head">
+          <h2 id="mine-title">Khu vườn bài văn của em 🌳</h2>
+          <button class="btn btn-small" id="btn-send-teacher" title="Lưu bài đã nộp ra một tệp để gửi thầy cô">📤 Gửi bài cho thầy cô</button>
+        </div>
         <div id="mine-stats" class="stat-grid"></div>
         <div id="mine-list" class="list"></div>
       </section>
@@ -182,7 +181,11 @@
       <section id="s-tasks" class="screen" hidden aria-labelledby="tasks-title">
         <div class="page-head">
           <h2 id="tasks-title">Bài tập thầy cô giao 🔔</h2>
-          <button class="btn btn-small" id="btn-enable-notify">🔔 Bật thông báo nhắc bài</button>
+          <div class="row-end">
+            <label class="btn btn-small" for="file-receive" title="Mở tệp bài tập / nhận xét thầy cô gửi">📥 Nhận bài tập từ tệp</label>
+            <input id="file-receive" type="file" accept=".json,application/json" hidden>
+            <button class="btn btn-small" id="btn-enable-notify">🔔 Bật thông báo nhắc bài</button>
+          </div>
         </div>
         <div id="tasks-list" class="list"></div>
       </section>
@@ -223,13 +226,13 @@
   </div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/data.js"></script>
   <script src="js/db.js"></script>
   <script src="js/spell.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/sync.js"></script>
+  <script src="js/samples.js"></script>
+  <script src="js/coach.js"></script>
+  <script src="js/backup.js"></script>
   <script src="js/notify.js"></script>
   <script src="js/report.js"></script>
   <script src="js/app.js"></script>

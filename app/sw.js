@@ -1,13 +1,11 @@
 /* Service worker của Vườn Văn: chạy ngoại tuyến + nhắc bài tập định kỳ */
-var CACHE = 'vuon-van-v1';
+var CACHE = 'vuon-van-v2';
 var SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/style.css',
-  'js/config.js', 'js/utils.js', 'js/data.js', 'js/db.js', 'js/spell.js', 'js/ai.js', 'js/sync.js',
+  './', 'index.html', 'manifest.webmanifest', 'css/fonts.css', 'css/style.css',
+  'js/utils.js', 'js/data.js', 'js/db.js', 'js/spell.js', 'js/samples.js', 'js/coach.js', 'js/backup.js',
   'js/notify.js', 'js/report.js', 'js/app.js', 'js/teacher.js',
   'assets/bg-login.jpg', 'assets/icon-192.png', 'assets/icon-512.png'
 ];
-// Thư viện/phông chữ từ CDN: lưu lại để lần sau dùng được khi mất mạng
-var CDN = /^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com|www\.gstatic\.com\/firebasejs|cdn\.jsdelivr\.net)\//;
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -22,24 +20,15 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
-  var url = new URL(req.url);
-  var same = url.origin === self.location.origin;
-  if (!same && !CDN.test(req.url)) return; // API (Anthropic, Firestore…) luôn đi thẳng ra mạng
+  if (new URL(req.url).origin !== self.location.origin) return;
+  // Ưu tiên bản mới nhất (khi thầy cô cập nhật app), không có mạng thì dùng bản đã lưu
   e.respondWith(caches.open(CACHE).then(function (cache) {
-    var fromNet = function () {
-      return fetch(req).then(function (res) {
-        if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
-        return res;
-      });
-    };
-    if (same) {
-      // Tệp của app: ưu tiên bản mới nhất từ mạng, mất mạng thì dùng bản đã lưu
-      return fromNet().catch(function () {
-        return cache.match(req, { ignoreSearch: true }).then(function (hit) { return hit || cache.match('index.html'); });
-      });
-    }
-    // Thư viện CDN (đã ghim phiên bản): dùng bản đã lưu cho nhanh
-    return cache.match(req).then(function (hit) { return hit || fromNet(); });
+    return fetch(req).then(function (res) {
+      if (res && res.ok) cache.put(req, res.clone());
+      return res;
+    }).catch(function () {
+      return cache.match(req, { ignoreSearch: true }).then(function (hit) { return hit || cache.match('index.html'); });
+    });
   }));
 });
 

@@ -1,5 +1,4 @@
-/* Kiểm tra chính tả – ngữ pháp tiếng Việt chạy NGOẠI TUYẾN (dựa trên luật).
-   Khi có mạng, app dùng thêm AI để kiểm tra sâu hơn (xem ai.js). */
+/* Kiểm tra chính tả – ngữ pháp tiếng Việt chạy hoàn toàn trên máy (dựa trên luật). */
 window.VV = window.VV || {};
 
 VV.spell = (function () {

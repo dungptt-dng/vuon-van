@@ -1,5 +1,5 @@
 /* Lưu trữ cục bộ bằng IndexedDB (chạy cả khi mất mạng).
-   Mọi bản ghi có: id, updatedAt; bản ghi chưa đồng bộ lên đám mây có _dirty = 1. */
+   Mọi bản ghi có: id, updatedAt (dùng để biết bản nào mới hơn khi gộp dữ liệu từ tệp). */
 window.VV = window.VV || {};
 
 VV.db = (function () {
@@ -51,30 +51,19 @@ VV.db = (function () {
       });
     },
     allRaw: function (store) { return tx(store, 'readonly', function (s) { return s.getAll(); }); },
-    /* Lưu bản ghi do người dùng thay đổi → đánh dấu cần đồng bộ */
     put: function (store, obj) {
       obj.updatedAt = Date.now();
-      obj._dirty = 1;
       return tx(store, 'readwrite', function (s) { s.put(obj); }).then(function () {
         document.dispatchEvent(new CustomEvent('vv:data', { detail: { store: store, id: obj.id } }));
         return obj;
       });
     },
-    /* Lưu bản ghi nhận về từ đám mây (không đánh dấu dirty) */
-    putRemote: function (store, obj) {
-      obj._dirty = 0;
+    /* Lưu nguyên bản ghi, không đổi updatedAt (dùng cho bản sao lưu) */
+    putRaw: function (store, obj) {
       return tx(store, 'readwrite', function (s) { s.put(obj); });
     },
-    markClean: function (store, id, updatedAt) {
-      return tx(store, 'readwrite', function (s) {
-        var r = s.get(id);
-        r.onsuccess = function () {
-          if (r.result && r.result.updatedAt === updatedAt) { r.result._dirty = 0; s.put(r.result); }
-        };
-      });
-    },
     remove: function (store, id) {
-      // Xoá mềm để thiết bị khác cũng nhận được thao tác xoá khi đồng bộ
+      // Xoá mềm để thao tác xoá cũng được chuyển sang máy khác qua tệp
       var self = this;
       return self.get(store, id).then(function (obj) {
         if (!obj) return;
@@ -90,32 +79,34 @@ VV.db = (function () {
       });
     },
     setKV: function (key, value) { return tx('kv', 'readwrite', function (s) { s.put({ key: key, value: value }); }); },
-    dirty: function (store) {
-      return tx(store, 'readonly', function (s) { return s.getAll(); }).then(function (rows) {
-        return (rows || []).filter(function (r) { return r._dirty; });
-      });
-    },
     exportAll: function () {
       var out = { app: 'vuon-van', version: 1, exportedAt: new Date().toISOString() };
       var data = ['students', 'essays', 'assignments', 'reports'];
       return Promise.all(data.map(function (n) { return tx(n, 'readonly', function (s) { return s.getAll(); }); }))
         .then(function (res) { data.forEach(function (n, i) { out[n] = res[i] || []; }); return out; });
     },
-    importAll: function (json) {
+    /* Gộp dữ liệu từ tệp: bản ghi nào mới hơn thì giữ. keep(store, row) để lọc (tuỳ chọn).
+       Trả về số bản ghi được thêm/cập nhật theo từng loại. */
+    importAll: function (json, keep) {
       var data = ['students', 'essays', 'assignments', 'reports'];
+      var counts = { students: 0, essays: 0, assignments: 0, reports: 0 };
       var ops = [];
       data.forEach(function (n) {
         (json[n] || []).forEach(function (row) {
+          if (!row || !row.id || (keep && !keep(n, row))) return;
+          delete row._dirty;
           ops.push(tx(n, 'readwrite', function (s) {
             var r = s.get(row.id);
             r.onsuccess = function () {
-              // Giữ bản mới hơn
-              if (!r.result || (row.updatedAt || 0) >= (r.result.updatedAt || 0)) { row._dirty = 1; s.put(row); }
+              if (!r.result || (row.updatedAt || 0) > (r.result.updatedAt || 0)) { s.put(row); counts[n]++; }
             };
           }));
         });
       });
-      return Promise.all(ops);
+      return Promise.all(ops).then(function () {
+        document.dispatchEvent(new CustomEvent('vv:data', { detail: { store: 'import', counts: counts } }));
+        return counts;
+      });
     }
   };
 })();
