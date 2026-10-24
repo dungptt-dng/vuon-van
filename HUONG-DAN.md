@@ -13,6 +13,8 @@ App luyện viết văn cho học sinh lớp 4, theo các dạng văn trong SGK 
 
 Muốn dùng trên máy khác: chép cả thư mục `VUON_VAN` (hoặc chỉ thư mục `app`) sang máy đó bằng USB.
 
+**Bản online (điện thoại, máy tính bảng):** mở <https://dungptt-dng.github.io/vuon-van/> bằng Chrome/Safari, chọn **Thêm vào màn hình chính** (Cài đặt app). Sau lần mở đầu tiên, app chạy được cả khi không có mạng. Bài làm vẫn chỉ lưu trên máy đó, không gửi lên mạng.
+
 ## 2. Các tính năng
 
 | Dành cho | Tính năng |
