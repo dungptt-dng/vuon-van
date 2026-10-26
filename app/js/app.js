@@ -9,7 +9,7 @@ window.VV = window.VV || {};
   var state = VV.state = {
     role: null, student: null, classCode: null,
     current: { genreId: null, themeId: 'tu-do', topic: '', topicCustom: '', hintTypes: ['vocab', 'paragraph'], request: '', assignmentId: null },
-    draft: null, essay: null, bookFilter: 'all', ignored: {}
+    draft: null, essay: null, ignored: {}
   };
 
   /* ================= TIỆN ÍCH GIAO DIỆN ================= */
@@ -211,18 +211,30 @@ window.VV = window.VV || {};
   }
 
   /* ================= CHỌN BÀI ================= */
+  var CUSTOM = '__custom';
+
   function bindChoose() {
-    $$('[data-book]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        state.bookFilter = b.getAttribute('data-book');
-        $$('[data-book]').forEach(function (x) { x.classList.toggle('active', x === b); });
-        renderGenres();
-      });
+    $('#sel-genre').addEventListener('change', function (e) {
+      state.current.genreId = e.target.value || null;
+      state.current.topic = '';
+      renderGenreInfo();
+      renderTopics();
     });
-    $('#topic-custom').addEventListener('input', function (e) {
-      state.current.topicCustom = e.target.value;
-      if (e.target.value.trim()) { state.current.topic = ''; $$('.topic-opt').forEach(function (o) { o.setAttribute('aria-checked', 'false'); }); }
+    $('#sel-theme').addEventListener('change', function (e) { state.current.themeId = e.target.value; });
+    $('#sel-topic').addEventListener('change', function (e) {
+      var v = e.target.value;
+      if (v === CUSTOM) {
+        state.current.topic = '';
+        $('#topic-custom-wrap').hidden = false;
+        $('#topic-custom').focus();
+      } else {
+        state.current.topic = v;
+        state.current.topicCustom = '';
+        $('#topic-custom').value = '';
+        $('#topic-custom-wrap').hidden = true;
+      }
     });
+    $('#topic-custom').addEventListener('input', function (e) { state.current.topicCustom = e.target.value; });
     $('#req').addEventListener('input', function (e) { state.current.request = e.target.value; });
     $('#btn-make-draft').addEventListener('click', makeDraft);
   }
@@ -232,7 +244,6 @@ window.VV = window.VV || {};
     renderThemes();
     renderTopics();
     renderHints();
-    $('#topic-custom').value = state.current.topicCustom || '';
     $('#req').value = state.current.request || '';
     var banner = $('#assignment-banner');
     if (state.current.assignmentId) {
@@ -247,49 +258,52 @@ window.VV = window.VV || {};
     } else banner.hidden = true;
   }
 
+  function option(value, label, selected) {
+    return '<option value="' + esc(value) + '"' + (selected ? ' selected' : '') + '>' + esc(label) + '</option>';
+  }
+
+  /* Dạng văn chia theo tập sách (dạng có ở cả hai tập xếp vào tập một) */
   function renderGenres() {
-    var grid = $('#genre-grid');
-    var list = VV.GENRES.filter(function (g) { return state.bookFilter === 'all' || g.sgk.indexOf(state.bookFilter) >= 0; });
-    grid.innerHTML = list.map(function (g) {
-      return '<button type="button" role="radio" class="genre-card" aria-checked="' + (state.current.genreId === g.id) + '" data-genre="' + g.id + '" style="--c:' + g.color + '">' +
-        '<span class="gi" aria-hidden="true">' + g.icon + '</span><b>' + esc(g.name) + '</b><small>' + esc(g.sgk) + '</small></button>';
-    }).join('');
-    $$('[data-genre]', grid).forEach(function (b) {
-      b.addEventListener('click', function () {
-        state.current.genreId = b.getAttribute('data-genre');
-        state.current.topic = '';
-        renderGenres();
-        renderTopics();
-        $('#step-topic').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
+    var cur = state.current.genreId;
+    var group = function (label, list) {
+      return '<optgroup label="' + esc(label) + '">' + list.map(function (g) { return option(g.id, g.icon + ' ' + g.name, cur === g.id); }).join('') + '</optgroup>';
+    };
+    var t1 = VV.GENRES.filter(function (g) { return g.sgk.indexOf('Tập một') >= 0; });
+    var t2 = VV.GENRES.filter(function (g) { return g.sgk.indexOf('Tập một') < 0; });
+    $('#sel-genre').innerHTML = option('', '— Em chọn dạng văn —', !cur) + group('📘 Tập một', t1) + group('📗 Tập hai', t2);
+    renderGenreInfo();
+  }
+
+  function renderGenreInfo() {
+    var box = $('#genre-info');
+    var g = VV.genreById(state.current.genreId);
+    box.hidden = !g;
+    if (g) box.innerHTML = '<span class="gi" aria-hidden="true">' + g.icon + '</span><div>' + (g.desc ? esc(g.desc) + '<br>' : '') + '<small class="muted">📖 SGK ' + esc(g.sgk) + ' · khoảng ' + g.minWords + ' – ' + g.maxWords + ' chữ</small></div>';
   }
 
   function renderThemes() {
-    var row = $('#theme-row');
-    row.innerHTML = VV.THEMES.map(function (t) {
-      return '<button type="button" role="radio" class="chip-btn" aria-checked="' + (state.current.themeId === t.id) + '" data-theme="' + t.id + '">' + t.icon + ' ' + esc(t.name) + '</button>';
+    $('#sel-theme').innerHTML = VV.THEMES.map(function (t) {
+      return option(t.id, t.icon + ' ' + t.name + (t.book ? ' (' + t.book + ')' : ''), state.current.themeId === t.id);
     }).join('');
-    $$('[data-theme]', row).forEach(function (b) {
-      b.addEventListener('click', function () { state.current.themeId = b.getAttribute('data-theme'); renderThemes(); });
-    });
   }
 
   function renderTopics() {
-    var box = $('#topic-list');
-    if (!state.current.genreId) { box.innerHTML = '<p class="muted">Em chọn dạng văn ở bước 1 trước nhé.</p>'; return; }
-    var g = genreOf(state.current.genreId);
-    box.innerHTML = g.topics.map(function (t, i) {
-      return '<button type="button" role="radio" class="topic-opt" aria-checked="' + (state.current.topic === t) + '" data-topic="' + i + '">📌 ' + esc(t) + '</button>';
-    }).join('');
-    $$('[data-topic]', box).forEach(function (b) {
-      b.addEventListener('click', function () {
-        state.current.topic = g.topics[+b.getAttribute('data-topic')];
-        state.current.topicCustom = '';
-        $('#topic-custom').value = '';
-        renderTopics();
-      });
-    });
+    var sel = $('#sel-topic');
+    var c = state.current;
+    if (!c.genreId) {
+      sel.innerHTML = option('', '— Em chọn dạng văn ở bước 1 trước —', true);
+      sel.disabled = true;
+      $('#topic-custom-wrap').hidden = true;
+      return;
+    }
+    var g = genreOf(c.genreId);
+    var custom = !!(c.topicCustom || '').trim();
+    sel.disabled = false;
+    sel.innerHTML = option('', '— Em chọn đề bài —', !c.topic && !custom) +
+      g.topics.map(function (t) { return option(t, '📌 ' + t, !custom && c.topic === t); }).join('') +
+      option(CUSTOM, '✏️ Em tự nhập đề bài khác…', custom);
+    $('#topic-custom').value = c.topicCustom || '';
+    $('#topic-custom-wrap').hidden = !custom;
   }
 
   function renderHints() {
@@ -741,8 +755,9 @@ window.VV = window.VV || {};
           var a = list.find(function (x) { return x.id === b.getAttribute('data-do'); });
           state.essay = null;
           state.current.genreId = a.genreId;
-          state.current.topic = '';
-          state.current.topicCustom = a.topic;
+          var inList = genreOf(a.genreId).topics.indexOf(a.topic) >= 0;
+          state.current.topic = inList ? a.topic : '';
+          state.current.topicCustom = inList ? '' : a.topic;
           state.current.assignmentId = a.id;
           ui.show('s-choose');
         });

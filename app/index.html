@@ -71,23 +71,21 @@
         <div id="assignment-banner" class="banner" hidden></div>
 
         <div class="step card">
-          <h3><span class="step-no">1</span> Dạng văn muốn viết <small class="muted">(theo SGK Tiếng Việt 4 – Kết nối tri thức)</small></h3>
-          <div class="filter-row" role="group" aria-label="Lọc theo tập sách">
-            <button class="chip-btn active" data-book="all">Tất cả</button>
-            <button class="chip-btn" data-book="Tập một">Tập một</button>
-            <button class="chip-btn" data-book="Tập hai">Tập hai</button>
-          </div>
-          <div id="genre-grid" class="genre-grid" role="radiogroup" aria-label="Dạng văn"></div>
+          <h3><span class="step-no">1</span> <label for="sel-genre">Dạng văn muốn viết</label> <small class="muted">(theo SGK Tiếng Việt 4 – Kết nối tri thức)</small></h3>
+          <select id="sel-genre" class="dd"></select>
+          <div id="genre-info" class="dd-info" hidden></div>
         </div>
 
         <div class="step card" id="step-topic">
           <h3><span class="step-no">2</span> Chủ đề</h3>
-          <p class="field-label">Chủ điểm trong sách</p>
-          <div id="theme-row" class="chip-row" role="radiogroup" aria-label="Chủ điểm"></div>
-          <p class="field-label">Đề bài gợi ý <span class="muted">(chọn một đề hoặc tự nhập)</span></p>
-          <div id="topic-list" class="topic-list" role="radiogroup" aria-label="Đề bài gợi ý"></div>
-          <label for="topic-custom" class="field-label">Hoặc em tự nhập đề bài</label>
-          <input id="topic-custom" type="text" maxlength="200" placeholder="Ví dụ: Tả cây xoài trong vườn nhà bà ngoại">
+          <label for="sel-theme" class="field-label">Chủ điểm trong sách</label>
+          <select id="sel-theme" class="dd"></select>
+          <label for="sel-topic" class="field-label">Đề bài</label>
+          <select id="sel-topic" class="dd"></select>
+          <div id="topic-custom-wrap" hidden>
+            <label for="topic-custom" class="field-label">Em tự nhập đề bài</label>
+            <input id="topic-custom" type="text" maxlength="200" placeholder="Ví dụ: Tả cây xoài trong vườn nhà bà ngoại">
+          </div>
         </div>
 
         <div class="step card">
