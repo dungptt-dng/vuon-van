@@ -161,6 +161,10 @@ select.dd option { font-weight: 600; }
 .word-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .2rem 0 .8rem; }
 .word-chip { background: var(--sky-50); border: 1.5px solid #cfe7fb; border-radius: 999px; padding: .2rem .65rem; font-weight: 600; cursor: pointer; }
 .word-chip:hover { background: #dff1ff; }
+.word-uses { list-style: none; padding: 0; margin: .2rem 0 .8rem; display: grid; gap: .45rem; }
+.word-uses li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .5rem; }
+.word-uses .word-chip { flex: none; }
+.word-use { color: #475569; font-size: .92rem; }
 .group-name { font-weight: 800; color: var(--leaf-d); margin: .3rem 0 .1rem; }
 .para-hint { border-left: 5px solid var(--sun); padding: .2rem 0 .2rem .8rem; margin-bottom: .8rem; }
 .para-hint .starter { font-style: italic; color: #6d28d9; }
@@ -298,7 +302,15 @@ textarea.mono { min-height: 140px; }
   .crit .bar { grid-column: 1 / -1; grid-row: 2; }
   .sticky-actions .btn { flex: 1 1 auto; }
   h2 { font-size: 1.35rem; }
+  .mindmap-wrap .mindmap { display: none; }
+  .mindmap-wrap .mindmap-list { display: grid; }
 }
+.mindmap-list { display: none; gap: .6rem; }
+.mm-center { justify-self: center; background: #fff8d6; border: 3px solid #f2c94c; border-radius: 999px; padding: .35rem 1.1rem; font-weight: 800; color: #1f7a39; text-align: center; }
+.mm-branch { border-left: 6px solid var(--c); border-radius: 12px; background: #f8fafc; padding: .4rem .7rem; }
+.mm-branch b { color: var(--c); }
+.mm-branch ul { margin: .2rem 0 0; padding-left: 1.1rem; }
+.mm-branch li::marker { color: var(--c); }
 
 /* ----- In báo cáo ----- */
 @media print {

@@ -296,11 +296,13 @@ window.VV = window.VV || {};
       $('#topic-custom-wrap').hidden = true;
       return;
     }
-    var g = genreOf(c.genreId);
+    var t = VV.coach.topicsFor(c.genreId);
     var custom = !!(c.topicCustom || '').trim();
+    var opts = function (list, icon) { return list.map(function (x) { return option(x, icon + ' ' + x, !custom && c.topic === x); }).join(''); };
     sel.disabled = false;
     sel.innerHTML = option('', '— Em chọn đề bài —', !c.topic && !custom) +
-      g.topics.map(function (t) { return option(t, '📌 ' + t, !custom && c.topic === t); }).join('') +
+      '<optgroup label="📘 Đề bài trong SGK">' + opts(t.sgk, '📌') + '</optgroup>' +
+      (t.kb.length ? '<optgroup label="🌱 Đề có gợi ý chi tiết">' + opts(t.kb, '⭐') + '</optgroup>' : '') +
       option(CUSTOM, '✏️ Em tự nhập đề bài khác…', custom);
     $('#topic-custom').value = c.topicCustom || '';
     $('#topic-custom-wrap').hidden = !custom;
@@ -361,6 +363,7 @@ window.VV = window.VV || {};
     if (!d) return '';
     return [d.intro]
       .concat(d.ideas || [])
+      .concat((d.vocabulary || []).reduce(function (a, v) { return a.concat((v.items || []).map(function (it) { return it.w + ': ' + it.use; })); }, []))
       .concat((d.paragraphs || []).map(function (p) { return p.part + '. ' + p.hints.join('. ') + '. ' + p.starter; }))
       .concat((d.outline || []).map(function (p) { return p.part + '. ' + p.points.join('. '); }))
       .concat(d.sample ? [d.sample] : []).join('. ');
@@ -370,10 +373,17 @@ window.VV = window.VV || {};
     return '<section class="card draft-sec"><h3><span>' + icon + ' ' + esc(title) + '</span><button type="button" class="speak-btn" data-speak aria-label="Đọc to mục ' + esc(title) + '">🔊</button></h3>' + inner + '</section>';
   }
 
+  /* Vốn từ: nhóm có câu mẫu (items: [{w, use}]) hiện từng từ kèm cách dùng; nhóm chỉ có từ (words) hiện thành chip */
   function vocabHtml(vocab, clickable) {
+    var chip = function (w) {
+      return clickable ? '<button type="button" class="word-chip" data-insert="' + esc(w) + '" title="Bấm để chèn vào bài">' + esc(w) + '</button>' : '<span class="word-chip">' + esc(w) + '</span>';
+    };
     return (vocab || []).map(function (v) {
-      return '<div class="group-name">' + esc(v.group) + '</div><div class="word-chips">' +
-        v.words.map(function (w) { return clickable ? '<button type="button" class="word-chip" data-insert="' + esc(w) + '" title="Bấm để chèn vào bài">' + esc(w) + '</button>' : '<span class="word-chip">' + esc(w) + '</span>'; }).join('') + '</div>';
+      var head = '<div class="group-name">' + esc(v.group) + '</div>';
+      if (!v.items) return head + '<div class="word-chips">' + v.words.map(chip).join('') + '</div>';
+      return head + '<ul class="word-uses">' + v.items.map(function (it) {
+        return '<li>' + chip(it.w) + '<span class="word-use">Cách dùng: ' + esc(it.use) + '</span></li>';
+      }).join('') + '</ul>';
     }).join('');
   }
 
@@ -399,48 +409,68 @@ window.VV = window.VV || {};
     return lines.slice(0, 3);
   }
 
+  /* Sơ đồ tư duy: nhánh xếp theo chiều kim đồng hồ – nửa đầu bên phải (trên xuống), nửa sau bên trái (dưới lên);
+     chiều cao tự giãn theo số ý để chữ không đè lên nhau */
   VV.renderMindmap = function (mm) {
     if (!mm || !mm.branches || !mm.branches.length) return '';
-    var W = 1200, H = 600, cx = 600, cy = 300, rx = 250, ry = 190;
+    var W = 1200, cx = 600;
     var colors = ['#2fa84f', '#4fb3f6', '#ff4f86', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444'];
-    var n = mm.branches.length;
+    var n = mm.branches.length, nRight = Math.ceil(n / 2);
+    var blocks = mm.branches.map(function (b, i) {
+      var kids = (b.children || []).slice(0, 4).map(function (k) {
+        var kl = wrapText(k, 24);
+        if (kl.join(' ').length < String(k).length) kl[kl.length - 1] = kl[kl.length - 1].slice(0, 22) + '…';
+        return { lines: kl, h: kl.length * 20 + 14 };
+      });
+      var label = wrapText(b.label, 14);
+      var bh = 22 + label.length * 22;
+      var kh = kids.reduce(function (a, k) { return a + k.h; }, 0);
+      return { b: b, i: i, kids: kids, label: label, bh: bh, h: Math.max(bh, kh) + 26, side: i < nRight ? 1 : -1 };
+    });
+    var right = blocks.filter(function (x) { return x.side > 0; });
+    var left = blocks.filter(function (x) { return x.side < 0; }).reverse();
+    var sum = function (l) { return l.reduce(function (a, x) { return a + x.h; }, 0); };
+    var H = Math.max(420, sum(right), sum(left)) + 40, cy = H / 2;
+    [right, left].forEach(function (col) {
+      var y = (H - sum(col)) / 2;
+      col.forEach(function (x) { x.y = y + x.h / 2; y += x.h; });
+    });
     var svg = '<svg class="mindmap" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Sơ đồ tư duy: ' + esc(mm.center) + '" font-family="Nunito, sans-serif">';
     var nodes = '';
-    mm.branches.forEach(function (b, i) {
-      var a = -Math.PI / 2 + (2 * Math.PI * i) / n + (n % 2 === 0 ? Math.PI / n : 0);
-      var bx = cx + rx * Math.cos(a), by = cy + ry * Math.sin(a);
-      var col = colors[i % colors.length];
-      var side = Math.cos(a) >= -0.01 ? 1 : -1;
-      svg += '<path d="M' + cx + ' ' + cy + ' Q ' + (cx + (bx - cx) * 0.5) + ' ' + (cy + (by - cy) * 0.9) + ' ' + bx + ' ' + by + '" stroke="' + col + '" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/>';
-      var kids = (b.children || []).slice(0, 4);
-      kids.forEach(function (k, j) {
-        var kx = bx + side * 140, ky = by + (j - (kids.length - 1) / 2) * 50;
-        var kl = wrapText(k, 22).slice(0, 2);
-        if (kl.length === 2 && kl.join(' ').length < k.length) kl[1] = kl[1].slice(0, 20) + '…';
-        svg += '<path d="M' + bx + ' ' + by + ' C ' + (bx + side * 70) + ' ' + by + ' ' + (bx + side * 70) + ' ' + ky + ' ' + kx + ' ' + ky + '" stroke="' + col + '" stroke-width="3" fill="none" opacity=".7"/>';
+    blocks.forEach(function (x) {
+      var side = x.side, bx = cx + side * 215, by = x.y, col = colors[x.i % colors.length], bw = 168;
+      svg += '<path d="M' + (cx + side * 60) + ' ' + cy + ' C ' + (cx + side * 120) + ' ' + cy + ' ' + (cx + side * 90) + ' ' + by + ' ' + (bx - side * bw / 2) + ' ' + by + '" stroke="' + col + '" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/>';
+      var kx = bx + side * (bw / 2 + 50);
+      var ky0 = by - x.kids.reduce(function (a, k) { return a + k.h; }, 0) / 2;
+      x.kids.forEach(function (k) {
+        var ky = ky0 + k.h / 2;
+        ky0 += k.h;
+        svg += '<path d="M' + (bx + side * bw / 2) + ' ' + by + ' C ' + (bx + side * (bw / 2 + 30)) + ' ' + by + ' ' + (bx + side * (bw / 2 + 20)) + ' ' + ky + ' ' + kx + ' ' + ky + '" stroke="' + col + '" stroke-width="3" fill="none" opacity=".7"/>';
         nodes += '<circle cx="' + kx + '" cy="' + ky + '" r="5" fill="' + col + '"/><text font-size="18" text-anchor="' + (side > 0 ? 'start' : 'end') + '" fill="#1e293b">' +
-          kl.map(function (l, li) { return '<tspan x="' + (kx + side * 10) + '" y="' + (ky + 6 + (li - (kl.length - 1) / 2) * 20) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
+          k.lines.map(function (l, li) { return '<tspan x="' + (kx + side * 12) + '" y="' + (ky + 6 + (li - (k.lines.length - 1) / 2) * 20) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
       });
-      var lines = wrapText(b.label, 14);
-      var bw = 168, bh = 22 + lines.length * 22;
-      nodes += '<rect x="' + (bx - bw / 2) + '" y="' + (by - bh / 2) + '" width="' + bw + '" height="' + bh + '" rx="18" fill="' + col + '"/>';
-      lines.forEach(function (l, li) {
-        nodes += '<text x="' + bx + '" y="' + (by - bh / 2 + 28 + li * 22) + '" font-size="18" font-weight="800" text-anchor="middle" fill="#fff">' + esc(l) + '</text>';
+      nodes += '<rect x="' + (bx - bw / 2) + '" y="' + (by - x.bh / 2) + '" width="' + bw + '" height="' + x.bh + '" rx="18" fill="' + col + '"/>';
+      x.label.forEach(function (l, li) {
+        nodes += '<text x="' + bx + '" y="' + (by - x.bh / 2 + 28 + li * 22) + '" font-size="18" font-weight="800" text-anchor="middle" fill="#fff">' + esc(l) + '</text>';
       });
     });
-    var cl = wrapText(mm.center, 16);
+    var cl = wrapText(mm.center, 14);
     var ch = 40 + cl.length * 26;
-    svg += nodes + '<ellipse cx="' + cx + '" cy="' + cy + '" rx="125" ry="' + (ch / 2 + 6) + '" fill="#fff8d6" stroke="#f2c94c" stroke-width="5"/>';
+    svg += nodes + '<ellipse cx="' + cx + '" cy="' + cy + '" rx="112" ry="' + (ch / 2 + 6) + '" fill="#fff8d6" stroke="#f2c94c" stroke-width="5"/>';
     cl.forEach(function (l, li) {
       svg += '<text x="' + cx + '" y="' + (cy - ch / 2 + 38 + li * 26) + '" font-size="21" font-weight="800" text-anchor="middle" fill="#1f7a39">' + esc(l) + '</text>';
     });
-    return svg + '</svg>';
+    // Màn hình hẹp (điện thoại): hiện sơ đồ dạng cây cho dễ đọc thay cho hình vẽ
+    var list = '<div class="mindmap-list"><div class="mm-center">' + esc(mm.center) + '</div>' + mm.branches.map(function (b, i) {
+      return '<div class="mm-branch" style="--c:' + colors[i % colors.length] + '"><b>' + esc(b.label) + '</b><ul>' + (b.children || []).map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>';
+    }).join('') + '</div>';
+    return svg + '</svg>' + list;
   };
 
   function renderDraft() {
     var d = state.draft, g = genreOf(state.current.genreId);
     $('#draft-title').textContent = d.title || 'Bản thảo gợi ý';
-    $('#draft-meta').innerHTML = '<span class="src-badge">🌱 Gợi ý theo SGK</span> · ' + esc(g.name) + ' · Đề: ' + esc(currentTopic());
+    $('#draft-meta').innerHTML = '<span class="src-badge">' + (d.subject ? '🌱 Gợi ý riêng: ' + esc(d.subject) : '🌱 Gợi ý theo SGK') + '</span> · ' + esc(g.name) + ' · Đề: ' + esc(currentTopic());
     var html = '';
     if (d.intro) html += '<div class="bubble">👩‍🏫 ' + esc(d.intro) + '</div>';
     html += '<div class="draft-grid">';
@@ -755,7 +785,8 @@ window.VV = window.VV || {};
           var a = list.find(function (x) { return x.id === b.getAttribute('data-do'); });
           state.essay = null;
           state.current.genreId = a.genreId;
-          var inList = genreOf(a.genreId).topics.indexOf(a.topic) >= 0;
+          var t = VV.coach.topicsFor(a.genreId);
+          var inList = t.sgk.concat(t.kb).indexOf(a.topic) >= 0;
           state.current.topic = inList ? a.topic : '';
           state.current.topicCustom = inList ? '' : a.topic;
           state.current.assignmentId = a.id;

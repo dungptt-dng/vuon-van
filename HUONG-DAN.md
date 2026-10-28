@@ -20,7 +20,7 @@ Muốn dùng trên máy khác: chép cả thư mục `VUON_VAN` (hoặc chỉ th
 | Dành cho | Tính năng |
 |---|---|
 | Học sinh | Chọn dạng văn (14 dạng theo SGK), chủ điểm, đề bài, cách gợi ý (vốn từ, ý, 2–3 gợi ý cho từng đoạn, sơ đồ tư duy, dàn ý, bài tham khảo) và nhập yêu cầu riêng |
-| Học sinh | Nhận **bản thảo gợi ý**, viết bài trên "giấy kẻ ô ly", bấm vào từ ngữ gợi ý để chèn vào bài |
+| Học sinh | Nhận **bản thảo gợi ý riêng cho đúng đề**: chọn câu chuyện, con vật, cây, người thân, sự việc… cụ thể thì dàn ý, sơ đồ tư duy, ý và từ ngữ (kèm câu mẫu cách dùng) đều bám sát đề tài đó. Viết bài trên "giấy kẻ ô ly", bấm vào từ ngữ gợi ý để chèn vào bài |
 | Học sinh | **Kiểm tra chính tả – ngữ pháp**: s/x, tr/ch, r/d/gi, l/n, dấu hỏi/ngã, ng/ngh, g/gh, c/k, viết hoa, dấu câu, từ lặp…; sửa từng lỗi hoặc sửa tất cả |
 | Học sinh | Nộp bài → **chấm điểm tự động** thang 10 (bố cục, nội dung, dùng từ – đặt câu, chính tả, sáng tạo), kèm lời nhận xét, điểm mạnh, điều cần cố gắng và các lỗi cần sửa |
 | Học sinh | Xem lại bài của em, bài tập thầy cô giao, nhận **nhắc bài tập** |
@@ -71,6 +71,11 @@ VUON_VAN/
    ├─ assets/          ← hình nền đăng nhập, biểu tượng
    └─ js/
       ├─ data.js       ← 14 dạng văn, chủ điểm, đề bài, vốn từ theo SGK
+      ├─ kb.js         ← kho kiến thức: cách nhận ra đề tài trong đề bài
+      ├─ kb-stories.js ← nội dung từng câu chuyện (nhân vật, diễn biến, bài học…)
+      ├─ kb-nature.js  ← con vật, cây cối để tả
+      ├─ kb-life.js    ← người thân, sự việc, thư
+      ├─ kb-tasks.js   ← hướng dẫn, đơn, giấy mời, báo cáo, ý kiến
       ├─ samples.js    ← bài tham khảo cho từng dạng văn
       ├─ coach.js      ← tạo bản thảo gợi ý & chấm điểm tự động
       ├─ spell.js      ← kiểm tra chính tả – ngữ pháp
@@ -80,4 +85,4 @@ VUON_VAN/
       └─ app.js, teacher.js, db.js, utils.js
 ```
 
-Muốn thêm đề bài hoặc vốn từ: mở `app/js/data.js` bằng Notepad, tìm dạng văn tương ứng và thêm vào danh sách `topics` hoặc `vocab`. Muốn đổi bài tham khảo: sửa `app/js/samples.js`.
+Muốn thêm đề bài hoặc vốn từ: mở `app/js/data.js` bằng Notepad, tìm dạng văn tương ứng và thêm vào danh sách `topics` hoặc `vocab`. Muốn thêm một câu chuyện, con vật, cây… có gợi ý chi tiết: chép một mục có sẵn trong `app/js/kb-*.js` rồi sửa nội dung (cách ghi từng phần có ở đầu tệp `app/js/kb.js`). Muốn đổi bài tham khảo: sửa `app/js/samples.js`.

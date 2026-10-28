@@ -280,7 +280,8 @@ VV.teacher = (function () {
       $('#t-assign').innerHTML = html;
       var fillTopics = function () {
         var g = VV.genreById($('#as-genre').value);
-        $('#as-topic').innerHTML = g.topics.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('');
+        var t = VV.coach.topicsFor(g.id);
+        $('#as-topic').innerHTML = t.sgk.concat(t.kb).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
       };
       fillTopics();
       $('#as-genre').addEventListener('change', fillTopics);
