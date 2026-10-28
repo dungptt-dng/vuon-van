@@ -15,12 +15,28 @@
 <body>
   <a class="skip" href="#main">Bỏ qua, đến nội dung chính</a>
 
+  <!-- Khu vườn trang trí phía sau: mặt trời, mây trôi, đồi cỏ, hoa, bướm -->
+  <div class="garden" aria-hidden="true">
+    <div class="g-sun"></div>
+    <div class="g-cloud c1"></div>
+    <div class="g-cloud c2"></div>
+    <div class="g-cloud c3"></div>
+    <div class="g-hills"></div>
+    <span class="g-flower f1">🌻</span>
+    <span class="g-flower f2">🌷</span>
+    <span class="g-flower f3">🌼</span>
+    <span class="g-flower f4">🌸</span>
+    <span class="g-bfly b1">🦋</span>
+    <span class="g-bfly b2">🐝</span>
+  </div>
+
   <!-- ============ MÀN HÌNH ĐĂNG NHẬP ============ -->
   <section id="s-login" class="screen login" aria-labelledby="login-title">
     <div class="login-bg" role="img" aria-label="Vườn Văn – Mỗi em một sắc hoa, mỗi bài văn một nét riêng"></div>
+    <button type="button" class="icon-btn music-btn login-music" aria-pressed="false" aria-label="Bật nhạc nền"></button>
     <form id="login-form" class="login-card" autocomplete="off" novalidate>
       <h1 id="login-title" class="sr-only">Vườn Văn</h1>
-      <p class="login-hello">Chào em! Em tên là gì nhỉ? 🌱</p>
+      <p class="login-hello">Chào em! Em tên là gì nhỉ?</p>
       <div class="login-fields">
         <div>
           <label for="login-name" class="field-label">Họ và tên của em</label>
@@ -55,6 +71,7 @@
         <span class="role-pill">👩‍🏫 Giáo viên · Lớp <b id="t-class-label"></b></span>
       </nav>
       <div class="top-right">
+        <button class="icon-btn music-btn" aria-pressed="false" aria-label="Bật nhạc nền"></button>
         <button class="icon-btn" id="btn-a11y" aria-label="Cỡ chữ và hiển thị" title="Cỡ chữ và hiển thị">Aa</button>
         <span class="who" id="who"></span>
         <button class="icon-btn" id="btn-logout" aria-label="Đăng xuất" title="Đăng xuất">⏏</button>
@@ -70,13 +87,13 @@
         </div>
         <div id="assignment-banner" class="banner" hidden></div>
 
-        <div class="step card">
+        <div class="step card tone-pink">
           <h3><span class="step-no">1</span> <label for="sel-genre">Dạng văn muốn viết</label> <small class="muted">(theo SGK Tiếng Việt 4 – Kết nối tri thức)</small></h3>
           <select id="sel-genre" class="dd"></select>
           <div id="genre-info" class="dd-info" hidden></div>
         </div>
 
-        <div class="step card" id="step-topic">
+        <div class="step card tone-orange" id="step-topic">
           <h3><span class="step-no">2</span> Chủ đề</h3>
           <label for="sel-theme" class="field-label">Chủ điểm trong sách</label>
           <select id="sel-theme" class="dd"></select>
@@ -88,12 +105,12 @@
           </div>
         </div>
 
-        <div class="step card">
+        <div class="step card tone-sky">
           <h3><span class="step-no">3</span> Cách gợi ý <small class="muted">(chọn một hoặc nhiều cách)</small></h3>
           <div id="hint-grid" class="hint-grid" role="group" aria-label="Cách gợi ý"></div>
         </div>
 
-        <div class="step card">
+        <div class="step card tone-leaf">
           <h3><span class="step-no">4</span> Yêu cầu cụ thể của em</h3>
           <label for="req" class="sr-only">Yêu cầu cụ thể</label>
           <textarea id="req" rows="3" maxlength="600" placeholder="Ví dụ: Em muốn tả chú mèo Mướp nhà em. Mướp có bộ lông vàng, rất thích nằm sưởi nắng và hay bắt chuột. Em muốn bài văn có hình ảnh so sánh."></textarea>
@@ -232,6 +249,7 @@
   <script src="js/kb-life.js"></script>
   <script src="js/kb-tasks.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/music.js"></script>
   <script src="js/spell.js"></script>
   <script src="js/samples.js"></script>
   <script src="js/coach.js"></script>

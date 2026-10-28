@@ -65,6 +65,29 @@ window.VV = window.VV || {};
       $('#main').focus({ preventScroll: true });
       var renderers = { 's-mine': renderMine, 's-tasks': renderTasks, 's-choose': renderChoose };
       if (renderers[id]) renderers[id]();
+    },
+    /* Pháo giấy + tiếng chuông chúc mừng khi em nộp bài */
+    celebrate: function () {
+      if (VV.music) VV.music.cheer();
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('hc')) return;
+      var box = document.createElement('div');
+      box.className = 'confetti';
+      box.setAttribute('aria-hidden', 'true');
+      var colors = ['#ff5c8a', '#ff8a3d', '#ffc928', '#2fb24c', '#3fa9f5', '#8b6cff'];
+      var stars = ['⭐', '🌟', '🌸', '🎉', '💖'];
+      for (var i = 0; i < 70; i++) {
+        var p = document.createElement('i');
+        if (i % 7 === 0) { p.className = 's'; p.textContent = stars[i % stars.length]; }
+        p.style.left = Math.random() * 100 + '%';
+        p.style.background = colors[i % colors.length];
+        p.style.setProperty('--dx', (Math.random() * 160 - 80) + 'px');
+        p.style.setProperty('--r', (Math.random() * 900 - 450) + 'deg');
+        p.style.animationDuration = (2.2 + Math.random() * 1.8) + 's';
+        p.style.animationDelay = (Math.random() * .6) + 's';
+        box.appendChild(p);
+      }
+      document.body.appendChild(box);
+      setTimeout(function () { box.remove(); }, 4800);
     }
   };
 
@@ -189,10 +212,13 @@ window.VV = window.VV || {};
   function openA11y() {
     Promise.all([VV.db.getKV('fontSize', 17), VV.db.getKV('highContrast', false), VV.db.getKV('reminderTime', '19:00')]).then(function (r) {
       var sizes = [[15, 'Nhỏ'], [17, 'Vừa'], [19, 'Lớn'], [22, 'Rất lớn']];
-      var d = ui.dialog('Hiển thị và nhắc nhở',
+      var d = ui.dialog('Hiển thị, âm thanh và nhắc nhở',
         '<p class="field-label">Cỡ chữ</p><div class="chip-row">' +
         sizes.map(function (s) { return '<button type="button" class="chip-btn ' + (s[0] === r[0] ? 'active' : '') + '" data-fs="' + s[0] + '">' + s[1] + '</button>'; }).join('') + '</div>' +
         '<label class="hint-card"><input type="checkbox" id="opt-hc" ' + (r[1] ? 'checked' : '') + '><b>Tương phản cao</b><small>Chữ đen đậm, viền rõ – dễ nhìn hơn</small></label>' +
+        '<label class="field-label" for="opt-vol">Nhạc nền</label><div class="music-row">' +
+        '<button type="button" class="icon-btn music-btn" id="opt-music"></button>' +
+        '<input type="range" id="opt-vol" min="0" max="100" step="5" value="' + Math.round(VV.music.getVolume() * 100) + '" aria-label="Âm lượng nhạc nền"></div>' +
         (state.role === 'student' ? '<label class="field-label" for="opt-rt">Giờ nhắc luyện viết mỗi ngày</label><input type="time" id="opt-rt" value="' + esc(r[2]) + '">' : '') +
         '<p class="muted small">Mẹo: bấm nút 🔊 cạnh các gợi ý để nghe đọc to.</p>',
         [{ label: 'Xong', cls: 'btn-primary' }]);
@@ -205,6 +231,8 @@ window.VV = window.VV || {};
         });
       });
       $('#opt-hc', d.el).addEventListener('change', function (e) { document.body.classList.toggle('hc', e.target.checked); VV.db.setKV('highContrast', e.target.checked); });
+      VV.music.bind($('#opt-music', d.el));
+      $('#opt-vol', d.el).addEventListener('input', function (e) { VV.music.setVolume(e.target.value / 100); });
       var rt = $('#opt-rt', d.el);
       if (rt) rt.addEventListener('change', function () { VV.db.setKV('reminderTime', rt.value); });
     });
@@ -666,6 +694,7 @@ window.VV = window.VV || {};
         state.current.assignmentId = null;
         renderResult(e);
         ui.show('s-result');
+        ui.celebrate();
       }).catch(function (err) {
         console.error(err);
         ui.toast('Có lỗi khi nộp bài, bài vẫn được lưu nháp. Em thử lại nhé.', 'err');

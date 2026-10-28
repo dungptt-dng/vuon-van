@@ -29,6 +29,7 @@ Muốn dùng trên máy khác: chép cả thư mục `VUON_VAN` (hoặc chỉ th
 | Giáo viên | **Báo cáo tiến độ** theo tuần / tháng / học kì / tuỳ chọn: biểu đồ, điểm từng em, theo dạng văn; tải Excel (CSV), in hoặc lưu PDF; app **tự lập báo cáo định kỳ** |
 | Giáo viên | Sao lưu tự động mỗi ngày, tải tệp sao lưu, khôi phục |
 | Mọi người | Cỡ chữ lớn, chế độ tương phản cao, đọc to bằng giọng nói (nút **Aa**) |
+| Mọi người | Nhạc nền vui tươi: bật/tắt bằng nút **🎵** (góc trên bên phải), chỉnh âm lượng trong nút **Aa**. Nhạc tự nhỏ lại khi app đọc to và phát từ lần chạm đầu tiên (trình duyệt không cho tự phát) |
 
 Điểm tự chấm dựa trên độ dài, bố cục, từ ngữ, lỗi chính tả… nên chỉ mang tính tham khảo – lời nhận xét và điểm của thầy cô vẫn là quan trọng nhất.
 

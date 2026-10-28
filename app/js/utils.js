@@ -59,4 +59,5 @@ VV.speak = function (text) {
   var vi = speechSynthesis.getVoices().find(function (v) { return /^vi/i.test(v.lang); });
   if (vi) u.voice = vi;
   speechSynthesis.speak(u);
+  if (VV.music) VV.music.duck();
 };
