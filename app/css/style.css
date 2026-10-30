@@ -182,18 +182,33 @@ input[type=range] { accent-color: var(--pink); width: 100%; }
 .login-actions .link-btn { flex: none; margin: 0 auto; }
 .login-recent { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-top: .6rem; }
 .login-recent:empty { display: none; }
+/* Thông tin giáo viên thực hiện app */
+.login-credit {
+  position: relative; z-index: 1; width: min(440px, calc(100% - 32px)); margin: 0 auto 1.2rem; padding: .45rem .9rem;
+  background: rgba(255, 255, 255, .85); border-radius: 16px; text-align: center;
+  font-size: .82rem; line-height: 1.45; color: #3d5368;
+}
+.login-credit span { display: block; }
+.login-credit b { color: var(--leaf-d); }
 @keyframes bounce-in { from { transform: translateY(40px) scale(.9); opacity: 0; } }
 @keyframes wave { 0%, 60%, 100% { transform: rotate(0); } 15%, 45% { transform: rotate(18deg); } 30% { transform: rotate(-10deg); } }
 @media (min-aspect-ratio: 1/1) {
   /* Màn hình ngang: khung gọn nằm dưới khẩu hiệu, trên cuốn vở trong tranh */
-  .login-card { width: min(720px, calc(100% - 32px)); margin-bottom: 2.5vh; padding: .9rem 1.2rem .8rem; }
+  .login-card { width: min(720px, calc(100% - 32px)); margin-bottom: calc(2.5vh + 30px); padding: .9rem 1.2rem .8rem; }
   .login-fields { grid-template-columns: 1.4fr 1fr; }
+  /* Dải nhỏ sát đáy màn hình, dưới khung đăng nhập */
+  .login-credit {
+    position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
+    margin: 0; padding: .2rem .9rem; font-size: .78rem;
+  }
+  .login-credit span { display: inline; }
+  .login-credit span + span::before { content: ' · '; }
 }
 @media (max-aspect-ratio: 1/1) {
   /* Màn hình dọc (điện thoại, máy tính bảng): tranh hiện đủ ở trên, khung đăng nhập ở dưới */
   .login { align-items: flex-start; flex-direction: column; background: linear-gradient(#8fd3ff, #d9f2ff 50%, #e9f9e4); }
   .login-bg { position: relative; inset: auto; width: 100%; aspect-ratio: 1672 / 941; flex: none; background-size: contain; background-position: center top; }
-  .login-card { margin: -1.2rem auto 1.5rem; }
+  .login-card { margin: -1.2rem auto .8rem; }
 }
 
 /* ===== KHUNG ỨNG DỤNG ===== */

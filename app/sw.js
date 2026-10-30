@@ -1,5 +1,5 @@
 /* Service worker của Vườn Văn: chạy ngoại tuyến + nhắc bài tập định kỳ */
-var CACHE = 'vuon-van-v5';
+var CACHE = 'vuon-van-v6';
 var SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/fonts.css', 'css/style.css',
   'js/utils.js', 'js/data.js', 'js/kb.js', 'js/kb-stories.js', 'js/kb-nature.js', 'js/kb-life.js', 'js/kb-tasks.js', 'js/db.js', 'js/music.js', 'js/spell.js', 'js/samples.js', 'js/coach.js', 'js/backup.js',
